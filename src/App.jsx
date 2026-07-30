@@ -1,15 +1,16 @@
 import { useState } from "react";
+import { isRightAnswer, answerText } from "./game";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
-
-function answerText(q) {
-  return q.type === "multiple_choice" ? q.options[q.answer] : String(q.answer);
-}
 
 export default function App() {
   const [notes, setNotes] = useState("");
   const [days, setDays] = useState(3);
   const [plan, setPlan] = useState(null);
+  const [view, setView] = useState("home"); // home | map | quiz | revenge | boss
+  const [section, setSection] = useState(null);
+  const [done, setDone] = useState([]); // ids of completed sections
+  const [missed, setMissed] = useState([]); // questions answered wrong
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -26,84 +27,212 @@ export default function App() {
       if (data.error) throw new Error(data.error);
       if (!data.days) throw new Error("Unexpected response from server");
       setPlan(data);
+      setDone([]);
+      setMissed([]);
+      setView("map");
     } catch (err) {
       setError("Couldn't build the quiz: " + err.message);
     }
     setLoading(false);
   }
 
-  if (plan) return <Quiz plan={plan} onReset={() => setPlan(null)} />;
+  // remember a wrong answer so the revenge round can resurface it
+  function recordMiss(q) {
+    setMissed((m) => (m.some((x) => x.question === q.question) ? m : [...m, q]));
+  }
+
+  function clearMiss(q) {
+    setMissed((m) => m.filter((x) => x.question !== q.question));
+  }
+
+  function openSection(id, sec) {
+    setSection({ id, ...sec });
+    setView("quiz");
+  }
+
+  if (!plan) {
+    return (
+      <div className="wrap">
+        <header>
+          <h1>TeachBack</h1>
+          <p className="sub">
+            Paste your notes. An AI turns them into a study campaign — and the
+            final boss is beaten by teaching it back.
+          </p>
+        </header>
+        <div className="card">
+          <textarea
+            rows={8}
+            placeholder="Paste your study notes here…"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+          />
+          <div className="row">
+            <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
+              <option value={1}>1 day</option>
+              <option value={3}>3 days</option>
+              <option value={7}>1 week</option>
+            </select>
+            <button className="btn" disabled={loading || !notes.trim()} onClick={generate}>
+              {loading ? "Building your campaign…" : "Build my campaign"}
+            </button>
+          </div>
+          {error && <p className="error">{error}</p>}
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "quiz" || view === "revenge") {
+    const isRevenge = view === "revenge";
+    return (
+      <Quiz
+        title={isRevenge ? "Revenge Round" : section.title}
+        questions={isRevenge ? missed : section.questions}
+        revenge={isRevenge}
+        onMiss={recordMiss}
+        onCleared={clearMiss}
+        onFinish={() => {
+          if (!isRevenge && !done.includes(section.id)) setDone([...done, section.id]);
+          setView("map");
+        }}
+      />
+    );
+  }
+
+  if (view === "boss") {
+    return <BossFight plan={plan} onBack={() => setView("map")} />;
+  }
 
   return (
+    <MissionMap
+      plan={plan}
+      done={done}
+      missed={missed}
+      onOpen={openSection}
+      onRevenge={() => setView("revenge")}
+      onBoss={() => setView("boss")}
+      onReset={() => { setPlan(null); setView("home"); }}
+    />
+  );
+}
+
+/* ---------- the campaign map ---------- */
+function MissionMap({ plan, done, missed, onOpen, onRevenge, onBoss, onReset }) {
+  return (
     <div className="wrap">
-      <header>
-        <h1>TeachBack</h1>
-        <p className="sub">Paste your notes and get an AI-generated study quiz.</p>
-      </header>
-      <div className="card">
-        <textarea
-          rows={8}
-          placeholder="Paste your study notes here…"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-        />
-        <div className="row">
-          <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
-            <option value={1}>1 day</option>
-            <option value={3}>3 days</option>
-            <option value={7}>1 week</option>
-          </select>
-          <button className="btn" disabled={loading || !notes.trim()} onClick={generate}>
-            {loading ? "Generating…" : "Generate quiz"}
-          </button>
+      <header className="head-row">
+        <div>
+          <h1>{plan.title || "Your campaign"}</h1>
+          <p className="sub">Work through each topic, then face the boss.</p>
         </div>
-        {error && <p className="error">{error}</p>}
+        <button className="btn ghost" onClick={onReset}>New notes</button>
+      </header>
+
+      {plan.days.map((d, di) => (
+        <div key={di} className="day">
+          <h2 className="day-title">Day {d.day} — {d.title}</h2>
+          {d.sections.map((s, si) => {
+            const id = `${di}-${si}`;
+            return (
+              <button key={si} className="node" onClick={() => onOpen(id, s)}>
+                <span className="node-name">
+                  {done.includes(id) ? "✓ " : ""}{s.title}
+                </span>
+                <span className="node-meta">{s.questions.length} questions</span>
+              </button>
+            );
+          })}
+        </div>
+      ))}
+
+      {/* Revenge Round — rough prototype */}
+      <div className="card feature">
+        <div className="feature-head">
+          <h2>Revenge Round</h2>
+          <span className="wip">prototype</span>
+        </div>
+        <p className="sub">
+          Every question you get wrong is collected here so you can hunt it down again.
+          {missed.length > 0
+            ? ` You currently have ${missed.length} unfinished question${missed.length === 1 ? "" : "s"}.`
+            : " Get something wrong and it will show up here."}
+        </p>
+        <button className="btn" disabled={missed.length === 0} onClick={onRevenge}>
+          {missed.length === 0 ? "Nothing to revenge yet" : `Fight ${missed.length} missed question${missed.length === 1 ? "" : "s"}`}
+        </button>
+        <p className="note">Planned: a recurring enemy that grows stronger the more you avoid it.</p>
+      </div>
+
+      {/* Final boss — rough prototype */}
+      <div className="card feature">
+        <div className="feature-head">
+          <h2>Final Boss — Teach It Back</h2>
+          <span className="wip">prototype</span>
+        </div>
+        <p className="sub">
+          The real test: explain everything in your own words and an AI grades how
+          well you actually understand it.
+        </p>
+        <button className="btn" onClick={onBoss}>Face the boss</button>
+        <p className="note">Planned: a real boss battle where your explanation score powers your attacks.</p>
       </div>
     </div>
   );
 }
 
-function Quiz({ plan, onReset }) {
-  const questions = plan.days.flatMap((d) => d.sections.flatMap((s) => s.questions));
+/* ---------- quiz / revenge round ---------- */
+function Quiz({ title, questions, revenge, onMiss, onCleared, onFinish }) {
   const [i, setI] = useState(0);
   const [right, setRight] = useState(0);
   const [chosen, setChosen] = useState(null);
   const [typed, setTyped] = useState("");
   const [revealed, setRevealed] = useState(false);
   const [wasRight, setWasRight] = useState(false);
-  const [done, setDone] = useState(false);
 
   const q = questions[i];
+  if (!q) {
+    return (
+      <div className="wrap">
+        <div className="card center">
+          <h1>{right} / {questions.length}</h1>
+          <p className="sub">
+            {revenge ? "Revenge round complete." : "Topic complete."}
+          </p>
+          <button className="btn" onClick={onFinish}>Back to campaign</button>
+        </div>
+      </div>
+    );
+  }
 
   function reveal(ok, idx = null) {
     if (revealed) return;
     setChosen(idx);
     setWasRight(ok);
     setRevealed(true);
-    if (ok) setRight((r) => r + 1);
-  }
-
-  function next() {
-    if (i + 1 >= questions.length) {
-      setDone(true);
+    if (ok) {
+      setRight((r) => r + 1);
+      if (revenge) onCleared(q);
     } else {
-      setI(i + 1);
-      setChosen(null);
-      setTyped("");
-      setRevealed(false);
-      setWasRight(false);
+      onMiss(q);
     }
   }
 
-  if (done) {
-    return <TeachBack plan={plan} score={Math.round((right / questions.length) * 100)} onReset={onReset} />;
+  function next() {
+    setI(i + 1);
+    setChosen(null);
+    setTyped("");
+    setRevealed(false);
+    setWasRight(false);
   }
 
   return (
     <div className="wrap">
       <header>
-        <h1>{plan.title || "Your quiz"}</h1>
-        <p className="sub">Question {i + 1} of {questions.length}</p>
+        <h1>{title}</h1>
+        <p className="sub">
+          {revenge ? "Questions you got wrong" : "Topic"} · {i + 1} of {questions.length}
+        </p>
       </header>
       <div className="card">
         <p className="q">{q.question}</p>
@@ -133,15 +262,10 @@ function Quiz({ plan, onReset }) {
               disabled={revealed}
               onChange={(e) => setTyped(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && typed.trim() && !revealed)
-                  reveal(typed.trim().toLowerCase() === String(q.answer).trim().toLowerCase());
+                if (e.key === "Enter" && typed.trim() && !revealed) reveal(isRightAnswer(q, typed));
               }}
             />
-            <button
-              className="btn"
-              disabled={revealed || !typed.trim()}
-              onClick={() => reveal(typed.trim().toLowerCase() === String(q.answer).trim().toLowerCase())}
-            >
+            <button className="btn" disabled={revealed || !typed.trim()} onClick={() => reveal(isRightAnswer(q, typed))}>
               Check
             </button>
           </div>
@@ -150,11 +274,11 @@ function Quiz({ plan, onReset }) {
         {revealed && (
           <div className="feedback">
             <p className={wasRight ? "good" : "bad"}>
-              {wasRight ? "Correct!" : `Correct answer: ${answerText(q)}`}
-              {q.explanation ? ` — ${q.explanation}` : ""}
+              {wasRight ? "Correct!" : `Answer: ${answerText(q)}`}
             </p>
+            {q.explanation && <p className="explain">{q.explanation}</p>}
             <button className="btn" onClick={next}>
-              {i + 1 >= questions.length ? "Finish" : "Next question"}
+              {i + 1 >= questions.length ? "Finish" : "Next"}
             </button>
           </div>
         )}
@@ -163,7 +287,8 @@ function Quiz({ plan, onReset }) {
   );
 }
 
-function TeachBack({ plan, score, onReset }) {
+/* ---------- final boss: teach it back ---------- */
+function BossFight({ plan, onBack }) {
   const topics = plan.days.flatMap((d) => d.sections.map((s) => s.title)).join(", ");
   const [text, setText] = useState("");
   const [result, setResult] = useState(null);
@@ -191,8 +316,8 @@ function TeachBack({ plan, score, onReset }) {
   return (
     <div className="wrap">
       <header>
-        <h1>Teach it back</h1>
-        <p className="sub">Quiz score: {score}%. Now the real test — explain it in your own words.</p>
+        <h1>Final Boss</h1>
+        <p className="sub">Teach the whole topic back in your own words.</p>
       </header>
       <div className="card">
         {!result ? (
@@ -205,9 +330,9 @@ function TeachBack({ plan, score, onReset }) {
             />
             {error && <p className="error">{error}</p>}
             <div className="row">
-              <button className="btn ghost" onClick={onReset}>Start over</button>
+              <button className="btn ghost" onClick={onBack}>Back</button>
               <button className="btn" disabled={loading || text.trim().length < 30} onClick={grade}>
-                {loading ? "Grading…" : "Submit explanation"}
+                {loading ? "The boss is judging…" : "Submit explanation"}
               </button>
             </div>
           </>
@@ -217,18 +342,18 @@ function TeachBack({ plan, score, onReset }) {
             {result.correct?.length > 0 && (
               <>
                 <h3 className="good">What you nailed</h3>
-                <ul>{result.correct.map((c, k) => <li key={k}>✓ {c}</li>)}</ul>
+                <ul>{result.correct.map((c, k) => <li key={k}>{c}</li>)}</ul>
               </>
             )}
             {result.missed?.length > 0 && (
               <>
                 <h3 className="bad">What you missed</h3>
-                <ul>{result.missed.map((m, k) => <li key={k}>✗ {m}</li>)}</ul>
+                <ul>{result.missed.map((m, k) => <li key={k}>{m}</li>)}</ul>
               </>
             )}
-            {result.followUp && <p style={{ marginTop: 14 }}><b>Follow-up:</b> {result.followUp}</p>}
+            {result.followUp && <p className="sub" style={{ marginTop: 14 }}><b>Follow-up:</b> {result.followUp}</p>}
             <div className="row">
-              <button className="btn" onClick={onReset}>Start over</button>
+              <button className="btn" onClick={onBack}>Back to campaign</button>
             </div>
           </>
         )}

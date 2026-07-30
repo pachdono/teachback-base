@@ -7,6 +7,7 @@
   --purple: #7c5cff;
   --green: #3ddc97;
   --red: #ff5c61;
+  --gold: #ffc24b;
 }
 
 * { box-sizing: border-box; }
@@ -19,10 +20,11 @@ body {
   line-height: 1.5;
 }
 
-.wrap { max-width: 640px; margin: 0 auto; padding: 40px 20px; }
+.wrap { max-width: 680px; margin: 0 auto; padding: 40px 20px 60px; }
 
 header h1 { margin: 0 0 4px; font-size: 30px; }
 .sub { color: var(--muted); margin: 0 0 22px; }
+.head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 
 .card {
   background: var(--card);
@@ -30,6 +32,7 @@ header h1 { margin: 0 0 4px; font-size: 30px; }
   border-radius: 12px;
   padding: 20px;
 }
+.card.center { text-align: center; }
 
 textarea, input, select {
   width: 100%;
@@ -55,9 +58,54 @@ textarea:focus, input:focus { border-color: var(--purple); }
   font-weight: 600;
   cursor: pointer;
 }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); }
 
+/* ---- campaign map ---- */
+.day { margin-bottom: 24px; }
+.day-title {
+  font-size: 15px;
+  color: var(--gold);
+  margin: 0 0 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.node {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.node:hover { border-color: var(--purple); }
+.node-name { font-weight: 600; }
+.node-meta { color: var(--muted); font-size: 13px; white-space: nowrap; }
+
+/* ---- prototype feature blocks ---- */
+.feature { margin-top: 18px; }
+.feature-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.feature-head h2 { margin: 0; font-size: 19px; }
+.wip {
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--gold);
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.note { color: var(--muted); font-size: 12.5px; font-style: italic; margin: 10px 0 0; }
+
+/* ---- quiz ---- */
 .q { font-size: 18px; font-weight: 600; margin: 0 0 14px; }
 .opts { display: grid; gap: 8px; }
 .opt {
@@ -75,11 +123,13 @@ textarea:focus, input:focus { border-color: var(--purple); }
 .opt.wrong { border-color: var(--red); background: rgba(255, 92, 97, 0.12); }
 
 .feedback { margin-top: 14px; }
+.feedback p { margin: 0 0 8px; }
+.explain { color: var(--muted); font-size: 14px; }
 .good { color: var(--green); }
 .bad { color: var(--red); }
 .error { color: var(--red); margin-top: 12px; }
 
 .score { font-size: 44px; font-weight: 800; color: var(--purple); margin: 6px 0; }
-h3 { margin: 16px 0 6px; }
+h3 { margin: 16px 0 6px; font-size: 16px; }
 ul { padding-left: 20px; margin: 0; }
 li { margin: 4px 0; }
