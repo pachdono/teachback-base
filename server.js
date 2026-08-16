@@ -9,6 +9,11 @@ app.use(express.json());
 
 const client = new Anthropic();
 
+/**
+ * Pull a JSON object out of a model reply.
+ * Models sometimes wrap JSON in ```json fences or add a sentence before it,
+ * so we strip fences and slice from the first { to the last }.
+ */
 function parseJson(text) {
   const t = text.replace(/```json|```/g, "").trim();
   const start = t.indexOf("{");
@@ -17,7 +22,13 @@ function parseJson(text) {
   return JSON.parse(t.slice(start, end + 1));
 }
 
-// Notes -> a study quiz spread over N days
+/**
+ * Notes -> a study campaign.
+ *
+ * The whole trick is constraining the model: we pin the response to one exact
+ * JSON shape so the app can render it directly as the campaign instead of
+ * trying to interpret prose. `days` decides how the material gets split up.
+ */
 app.post("/api/lesson", async (req, res) => {
   try {
     const { notes, days } = req.body;
@@ -46,7 +57,13 @@ Material: ${notes}`,
   }
 });
 
-// The student's explanation -> a grade
+/**
+ * A student's explanation -> a grade.
+ *
+ * This is the Feynman-technique check: instead of asking whether they can pick
+ * the right option, we ask whether they can teach the topic. The model returns
+ * a score plus, more usefully, the specific points they left out.
+ */
 app.post("/api/grade", async (req, res) => {
   try {
     const { topic, explanation } = req.body;

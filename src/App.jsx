@@ -3,6 +3,10 @@ import { isRightAnswer, answerText } from "./game";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
+/**
+ * Top-level app. Holds the campaign and routes between the four screens:
+ * the map, a quiz, the Revenge Round, and the boss.
+ */
 export default function App() {
   const [notes, setNotes] = useState("");
   const [days, setDays] = useState(3);
@@ -10,7 +14,7 @@ export default function App() {
   const [view, setView] = useState("home"); // home | map | quiz | revenge | boss
   const [section, setSection] = useState(null);
   const [done, setDone] = useState([]); // ids of completed sections
-  const [missed, setMissed] = useState([]); // questions answered wrong
+  const [missed, setMissed] = useState([]); // wrong answers -> the Revenge Round
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -36,7 +40,10 @@ export default function App() {
     setLoading(false);
   }
 
-  // remember a wrong answer so the revenge round can resurface it
+  // The weakness-tracking loop, in two functions: a wrong answer goes into
+  // `missed`, and getting it right in the Revenge Round takes it back out.
+  // Everything we want to build on top of this (a recurring enemy that grows
+  // stronger the longer you avoid it) reads from this one array.
   function recordMiss(q) {
     setMissed((m) => (m.some((x) => x.question === q.question) ? m : [...m, q]));
   }
@@ -181,7 +188,11 @@ function MissionMap({ plan, done, missed, onOpen, onRevenge, onBoss, onReset }) 
   );
 }
 
-/* ---------- quiz / revenge round ---------- */
+/**
+ * One question at a time, used for both a normal topic and the Revenge Round.
+ * `revenge` only changes the labelling and tells it to clear a question from
+ * the missed pool when the student finally gets it right.
+ */
 function Quiz({ title, questions, revenge, onMiss, onCleared, onFinish }) {
   const [i, setI] = useState(0);
   const [right, setRight] = useState(0);
@@ -287,7 +298,11 @@ function Quiz({ title, questions, revenge, onMiss, onCleared, onFinish }) {
   );
 }
 
-/* ---------- final boss: teach it back ---------- */
+/**
+ * The final boss: the student writes an explanation of everything and the AI
+ * grades it. This is the part that checks understanding rather than recognition
+ * — you can't pass by guessing between four options.
+ */
 function BossFight({ plan, onBack }) {
   const topics = plan.days.flatMap((d) => d.sections.map((s) => s.title)).join(", ");
   const [text, setText] = useState("");
