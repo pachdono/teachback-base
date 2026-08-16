@@ -1,48 +1,48 @@
 # TeachBack
 
-Paste your notes and an AI turns them into a study campaign — then the real test
-is teaching it back in your own words.
+Paste your notes, get a study campaign, and beat a final boss by explaining the
+topic in your own words.
 
-## The idea
+## Why we made it
 
-Studying is passive. You re-read notes for hours, it feels productive, and you
-don't find out what you actually missed until the exam. TeachBack makes studying
-active: your own material becomes a campaign of quizzes, the questions you get
-wrong come back to hunt you, and the final boss is beaten by *explaining* the
-topic — the Feynman technique, graded by AI.
+You can read your notes for three hours and still not find out what you actually
+misunderstood until the test. By then it's too late. We wanted something that
+tells you earlier, and that isn't boring enough to quit after two days.
 
-## Core functions (current state)
+## What it does now
 
-| Feature | Status |
-|---|---|
-| **Notes → campaign** — AI builds a multi-day plan of topics and questions from anything you paste | working |
-| **Quizzes with explanations** — multiple choice and fill-in, with the reasoning shown when you're wrong | working |
-| **Revenge Round** — every missed question is collected so you can hunt it down again | prototype |
-| **Final Boss: Teach It Back** — explain the whole topic in your own words; the AI scores you and names what you missed | prototype |
+- Paste any notes and an AI splits them into topics spread over a few days
+- Quiz questions (multiple choice and fill in the blank) that show you the
+  reasoning when you get one wrong
+- Anything you miss gets saved into a **Revenge Round** so you can go back and
+  beat it
+- A **final boss** where you type out an explanation of the whole topic. An AI
+  scores it out of 100 and tells you which bits you left out
 
-The Revenge Round and the Final Boss are the ideas that make TeachBack different,
-and both are currently rough — they work end to end, but they're plain screens.
-Turning them into the real experience is the next phase.
+## Where it's at
+
+The campaign generator and the quizzes are solid. The Revenge Round and the boss
+both work end to end, but they're plain screens right now — they prove the idea
+without being fun yet. Those two are the parts that make TeachBack different from
+a flashcard app, so they're what we're building out next.
 
 ## What's next
 
-- **Revenge Round** → a recurring enemy that grows stronger the longer you avoid it
-- **Final Boss** → a real battle where your teach-back score powers your attacks
-- Progression: XP, streaks, and unlockables to keep students coming back
-- Accounts and a shared leaderboard
+- Revenge Round becomes an actual enemy that gets harder the longer you avoid it
+- The boss becomes a real fight where your explanation score decides how hard you hit
+- XP and streaks so there's a reason to come back
+- Accounts, so progress saves, and a leaderboard to compete with classmates
 
-## Run locally
+## Running it
 
 1. `npm install`
-2. Copy `.env.example` to `.env` and set your `ANTHROPIC_API_KEY`
-3. Start the backend: `npm run server` (port 3001)
-4. Start the frontend: `npm run dev` (port 5174)
+2. Copy `.env.example` to `.env` and put your `ANTHROPIC_API_KEY` in it
+3. `npm run server` — backend on port 3001
+4. `npm run dev` — frontend on port 5174
 
-## Stack
+## How it's built
 
-React + Vite on the front, Express on the back. The API key stays server-side —
-the browser never sees it. All questions and grading come from the Anthropic API.
+React + Vite on the front, Express on the back. The API key lives on the server,
+never in the browser. All the questions and the grading come from the Anthropic API.
 
----
-
-Built by pachdono & Casper — HackHarvard Hangzhou 2026.
+Built by pachdono and Casper for HackHarvard Hangzhou 2026.
