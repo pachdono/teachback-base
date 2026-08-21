@@ -4,88 +4,177 @@ import "dotenv/config";
 import Anthropic from "@anthropic-ai/sdk";
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+
+// Only our own front end may call this. Without it, anyone who finds the URL
+// can spend our Anthropic credits.
+const ALLOWED = (process.env.ALLOWED_ORIGINS || "http://localhost:5173,http://localhost:5174,http://localhost:4173").split(",");
+app.use(cors({
+  origin(origin, cb) {
+    // no Origin header means curl or a health check, not a browser
+    if (!origin || ALLOWED.includes(origin)) return cb(null, true);
+    cb(new Error("blocked"));
+  },
+}));
+
+// Notes can be long, but not unlimited.
+app.use(express.json({ limit: "1mb" }));
+
+// Simple per-IP limit: generation is slow and costs money.
+const hits = new Map();
+app.use("/api", (req, res, next) => {
+  const now = Date.now();
+  const rec = hits.get(req.ip);
+  if (!rec || now > rec.reset) { hits.set(req.ip, { n: 1, reset: now + 60000 }); return next(); }
+  if (rec.n >= 20) return res.status(429).json({ error: "Too many requests. Wait a minute." });
+  rec.n++;
+  next();
+});
 
 const client = new Anthropic();
 
-/**
- * Pull a JSON object out of a model reply.
- * Models sometimes wrap JSON in ```json fences or add a sentence before it,
- * so we strip fences and slice from the first { to the last }.
- */
-function parseJson(text) {
-  const t = text.replace(/```json|```/g, "").trim();
+const MAX_NOTES = 24000;
+
+// Errors we wrote are safe to show. Anything else stays in the log.
+function userError(message) {
+  const e = new Error(message);
+  e.show = true;
+  return e;
+}
+
+function fail(res, err) {
+  console.error(err);
+  res.status(500).json({ error: err.show ? err.message : "Something went wrong. Please try again." });
+}
+
+// The first block is only text when the model is not thinking, so find it by type.
+function pickText(msg) {
+  if (msg.stop_reason === "max_tokens") throw userError("The answer was cut off. Try shorter notes or fewer days.");
+  const block = msg.content.find((b) => b.type === "text");
+  if (!block) throw new Error("no text block in response");
+  return block.text;
+}
+
+function safeParse(text) {
+  let t = text.replace(/```json|```/g, "").trim();
   const start = t.indexOf("{");
   const end = t.lastIndexOf("}");
-  if (start === -1 || end === -1) throw new Error("No JSON in AI response");
+  if (start === -1 || end === -1) throw new Error("No JSON found in AI response");
   return JSON.parse(t.slice(start, end + 1));
 }
 
-/**
- * Notes -> a study campaign.
- *
- * The whole trick is constraining the model: we pin the response to one exact
- * JSON shape so the app can render it directly as the campaign instead of
- * trying to interpret prose. `days` decides how the material gets split up.
- */
 app.post("/api/lesson", async (req, res) => {
   try {
     const { notes, days } = req.body;
-    const msg = await client.messages
-      .stream({
-        model: "claude-sonnet-4-6",
-        max_tokens: 8000,
-        system: "You create study quizzes. Respond ONLY with valid JSON. No markdown fences.",
-        messages: [
-          {
-            role: "user",
-            content: `Turn this material into a quiz spread over ${days} day(s).
-Use sections of 4-5 questions each. Question types: "multiple_choice" (4 options, "answer" = correct index) or "fill_blank" ("answer" = the word/phrase). Add a short "explanation" to every question. Include a top-level "title".
-Return JSON exactly like:
-{"title":"...","days":[{"day":1,"title":"...","sections":[{"title":"...","questions":[{"type":"multiple_choice","question":"...","options":["a","b","c","d"],"answer":0,"explanation":"..."}]}]}]}
+    const material = String(notes || "").slice(0, MAX_NOTES);
+    if (!material.trim()) throw userError("No notes provided.");
+    // scale structure to the plan length: a 1-day sprint = fewer paths but denser
+    // questions; longer plans = more paths (sections) spread across the days.
+    const perDay = days === 1 ? 2 : 3;
+    const totalSections = Math.min(days * perDay, 16);
+    const qPer = days === 1 ? "7-9" : "4-6";
+    const msg = await client.messages.stream({
+      model: "claude-sonnet-4-6",
+      max_tokens: 30000,
+      system: "You create structured study plans. Respond ONLY with valid, complete JSON. No markdown fences, no trailing commas.",
+      messages: [{
+        role: "user",
+        content: `Create a study plan spread over ${days} day(s) from this material.
+Use ${totalSections} sections in total, distributed across the ${days} day(s) (roughly ${perDay} per day).
+Each section has ${qPer} questions. Keep every question under 20 words.
+Question types: "multiple_choice" (4 options, "answer" = correct index) or "fill_blank" ("answer" = the word/phrase).
+For "fill_blank", also include "accept": an array of 0-3 alternative correct answers (different spellings, numeric vs word form, common synonyms).
+Every question MUST include an "explanation" (1-2 sentences) that says WHY the answer is correct. For math, calculations, or any step-based problem, show the method/working used to reach the answer — not just the final result. Use "\\n" between steps when it helps readability.
+Every question MUST also include a "hint" — a short nudge (under 15 words) that points toward the method WITHOUT revealing the answer.
+Also include a short top-level "title" (under 6 words) naming the overall subject.
+Keep all text concise. Return JSON exactly like:
+{"title":"...","days":[{"day":1,"title":"...","sections":[{"title":"...","questions":[{"type":"multiple_choice","question":"...","options":["a","b","c","d"],"answer":0,"explanation":"...","hint":"..."},{"type":"fill_blank","question":"...","answer":"...","explanation":"...","hint":"..."}]}]}]}
 
-Material: ${notes}`,
-          },
-        ],
-      })
-      .finalMessage();
-    res.json(parseJson(msg.content[0].text));
+Material: ${material}`
+      }]
+    }).finalMessage();
+    res.json(safeParse(pickText(msg)));
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    fail(res, err);
   }
 });
 
-/**
- * A student's explanation -> a grade.
- *
- * This is the Feynman-technique check: instead of asking whether they can pick
- * the right option, we ask whether they can teach the topic. The model returns
- * a score plus, more usefully, the specific points they left out.
- */
+app.post("/api/exam", async (req, res) => {
+  try {
+    const { topic, count } = req.body;
+    const n = Math.min(Math.max(parseInt(count) || 10, 5), 25);
+    const msg = await client.messages.stream({
+      model: "claude-sonnet-4-6",
+      max_tokens: 24000,
+      system: "You create mock exams. Respond ONLY with valid, complete JSON. No markdown fences, no trailing commas.",
+      messages: [{
+        role: "user",
+        content: `Create a mock exam with exactly ${n} questions on this topic: ${topic}
+Mix "multiple_choice" (4 options, "answer" = correct index) and "fill_blank" ("answer" = the word/phrase). For "fill_blank", also include "accept": an array of 0-3 alternative correct answers (different spellings, numeric vs word form, common synonyms). Cover the topic broadly with difficulty increasing from easy to hard. Keep each question under 25 words.
+Every question MUST include an "explanation" (1-2 sentences) that shows the method/working used to reach the answer — not just the final result.
+Also include a short "title" (under 6 words) for the exam.
+Return JSON exactly like:
+{"title":"...","questions":[{"type":"multiple_choice","question":"...","options":["a","b","c","d"],"answer":0,"explanation":"..."},{"type":"fill_blank","question":"...","answer":"...","explanation":"..."}]}`
+      }]
+    }).finalMessage();
+    res.json(safeParse(pickText(msg)));
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+app.post("/api/summary", async (req, res) => {
+  try {
+    const { material, title } = req.body;
+    const msg = await client.messages.stream({
+      model: "claude-sonnet-4-6",
+      max_tokens: 8000,
+      system: "You create concise study sheets. Respond ONLY with valid, complete JSON. No markdown fences, no trailing commas.",
+      messages: [{
+        role: "user",
+        content: `Create a one-page study sheet summarizing this material${title ? ` (topic: ${title})` : ""}.
+Make it genuinely easy to understand: plain language, short bullets, the big picture first.
+Return JSON exactly like:
+{"title":"...","overview":"2-3 sentence big-picture summary","sections":[{"heading":"...","bullets":["...","..."]}],"keyTerms":[{"term":"...","def":"one-line definition"}],"examTips":["...","..."]}
+Use 3-6 sections with 3-5 bullets each, 5-10 key terms, and 3-5 exam tips.
+
+Material: ${String(material).slice(0, 24000)}`
+      }]
+    }).finalMessage();
+    res.json(safeParse(pickText(msg)));
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
 app.post("/api/grade", async (req, res) => {
   try {
     const { topic, explanation } = req.body;
     const msg = await client.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 1500,
+      max_tokens: 3000,
       system: "You grade student explanations. Respond ONLY with valid JSON.",
-      messages: [
-        {
-          role: "user",
-          content: `Topic: ${topic}
+      messages: [{
+        role: "user",
+        content: `Topic: ${topic}
 Student's explanation: ${explanation}
-Grade fairly. Return JSON exactly like:
-{"score":85,"correct":["..."],"missed":["..."],"followUp":"..."}`,
-        },
-      ],
+Grade strictly but fairly. Also write 0-3 "reviewQuestions" targeting ONLY the missed points: multiple_choice with 4 options, "answer" = correct index, plus "explanation" (why/how) and "hint" (nudge without the answer). Return JSON exactly like:
+{"score":85,"correct":["..."],"missed":["..."],"followUp":"...","reviewQuestions":[{"type":"multiple_choice","question":"...","options":["a","b","c","d"],"answer":0,"explanation":"...","hint":"..."}]}`
+      }]
     });
-    res.json(parseJson(msg.content[0].text));
+    res.json(safeParse(pickText(msg)));
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    fail(res, err);
   }
+});
+
+// Body-too-large and CORS rejections happen before any route, so they need
+// their own handler or the browser gets an HTML page it cannot parse.
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  console.error(err);
+  if (err.type === "entity.too.large") return res.status(413).json({ error: "Those notes are too long." });
+  if (err.message === "blocked") return res.status(403).json({ error: "Request blocked." });
+  res.status(500).json({ error: "Something went wrong." });
 });
 
 const PORT = process.env.PORT || 3001;

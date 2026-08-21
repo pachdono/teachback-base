@@ -1,10 +1,10 @@
-const MONSTERS = ["slime", "eyeball", "bat", "spore"];
+export const MONSTERS = ["slime", "eyeball", "bat", "spore"];
 
-const CHAR_ATK = { spaceboy: "blaster", bob: "raygun", robert: "laser", max: "slash", einstein: "orb" };
+export const CHAR_ATK = { spaceboy: "blaster", bob: "raygun", robert: "laser", max: "slash", einstein: "orb" };
 
-const MONSTER_MOVE = { slime: "SLIME SURGE!", eyeball: "EYE LASER!", bat: "WING SLASH!", spore: "SPORE BOMB!" };
+export const MONSTER_MOVE = { slime: "SLIME SURGE!", eyeball: "EYE LASER!", bat: "WING SLASH!", spore: "SPORE BOMB!" };
 
-const CHARACTERS = [
+export const CHARACTERS = [
   { id: "spaceboy", name: "Space Boy", tag: "Astronaut ace of the academy", tint: "#ff9f1c" },
   { id: "bob", name: "Bob", tag: "Blue, friendly, slightly squishy", tint: "#4cc9f0" },
   { id: "robert", name: "Robert", tag: "Fully certified quiz machine", tint: "#9aa7c7" },
@@ -12,7 +12,7 @@ const CHARACTERS = [
   { id: "einstein", name: "Einstein", tag: "A small world of big brains", tint: "#3ddc97" },
 ];
 
-const PIXEL_SPRITES = {
+export const PIXEL_SPRITES = {
   spaceboy: {
     colors: { k: "#241e4d", w: "#f2eeff", v: "#352a68", r: "#8f86c9", o: "#ff9f1c" },
     map: [
@@ -211,7 +211,7 @@ const PIXEL_SPRITES = {
   },
 };
 
-function PixelSprite({ id, size = 86 }) {
+export function PixelSprite({ id, size = 86 }) {
   const spr = PIXEL_SPRITES[id] || PIXEL_SPRITES.spaceboy;
   const cols = spr.map[0].length;
   const rows = spr.map.length;
