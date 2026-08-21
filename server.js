@@ -7,11 +7,14 @@ const app = express();
 
 // Only our own front end may call this. Without it, anyone who finds the URL
 // can spend our Anthropic credits.
-const ALLOWED = (process.env.ALLOWED_ORIGINS || "http://localhost:5173,http://localhost:5174,http://localhost:4173").split(",");
+const ALLOWED = (process.env.ALLOWED_ORIGINS || "").split(",").filter(Boolean);
 app.use(cors({
   origin(origin, cb) {
     // no Origin header means curl or a health check, not a browser
-    if (!origin || ALLOWED.includes(origin)) return cb(null, true);
+    if (!origin) return cb(null, true);
+    // any localhost port during development - vite picks whatever is free
+    if (/^https?:\/\/localhost:\d+$/.test(origin)) return cb(null, true);
+    if (ALLOWED.includes(origin)) return cb(null, true);
     cb(new Error("blocked"));
   },
 }));
@@ -161,6 +164,34 @@ Grade strictly but fairly. Also write 0-3 "reviewQuestions" targeting ONLY the m
 {"score":85,"correct":["..."],"missed":["..."],"followUp":"...","reviewQuestions":[{"type":"multiple_choice","question":"...","options":["a","b","c","d"],"answer":0,"explanation":"...","hint":"..."}]}`
       }]
     });
+    res.json(safeParse(pickText(msg)));
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+
+app.post("/api/podcast", async (req, res) => {
+  try {
+    const { material, title } = req.body;
+    const text = String(material || "").slice(0, MAX_NOTES);
+    if (!text.trim()) throw userError("Nothing to turn into an episode.");
+    const msg = await client.messages.stream({
+      model: "claude-sonnet-4-6",
+      max_tokens: 6000,
+      system: "You write short study podcasts. Respond ONLY with valid JSON. No markdown fences.",
+      messages: [{
+        role: "user",
+        content: `Turn this material into a short spoken study episode${title ? ` about ${title}` : ""}.
+Write it to be LISTENED to, not read: short sentences, plain words, no bullet points, no headings, no symbols.
+Two hosts talking naturally - one explains, the other asks the questions a confused student would ask.
+Cover the main ideas in order, simplest first. Around 500-700 words total.
+Return JSON exactly like:
+{"title":"...","lines":[{"speaker":"host","text":"..."},{"speaker":"guest","text":"..."}]}
+
+Material: ${text}`
+      }]
+    }).finalMessage();
     res.json(safeParse(pickText(msg)));
   } catch (err) {
     fail(res, err);

@@ -1582,3 +1582,28 @@ img.enemy, img.boss-skull {
   .vol-slider { width: 54px; }
   .phase-banner { font-size: 19px; white-space: normal; width: 90%; }
 }
+
+/* ---- Record a lecture ---- */
+.rec-dot { width: 10px; height: 10px; border-radius: 50%; background: #e5484d; animation: rec-pulse 1.1s ease-in-out infinite; }
+@keyframes rec-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+.rec-heard {
+  margin-top: 10px; padding: 10px 12px; max-height: 120px; overflow-y: auto;
+  border-radius: var(--radius); border: 1px solid var(--line);
+  background: rgba(0,0,0,.25); font-size: 13px; color: var(--muted); line-height: 1.6;
+}
+
+/* ---- Listen: podcast ---- */
+.voice-row { display: flex; gap: 14px; flex-wrap: wrap; margin: 14px 0 4px; }
+.voice-row label { display: flex; flex-direction: column; gap: 4px; }
+.script { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
+.script-line {
+  padding: 10px 12px; border-radius: var(--radius); line-height: 1.6;
+  border: 1px solid transparent; background: rgba(255,255,255,.03);
+  transition: background var(--dur) var(--ease), border var(--dur) var(--ease);
+}
+.script-line .who {
+  display: block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 4px;
+}
+.script-line.guest { background: rgba(255,255,255,.015); }
+.script-line.now { border-color: var(--purple2); background: color-mix(in srgb, var(--purple) 14%, transparent); }

@@ -5,6 +5,7 @@ import { PixelSprite } from "./sprites";
 import { sfx, setMasterVolume, loadSave, SAVE, localDate, shuffle, shuffleOptions, QUEST_GOAL, QUEST_XP } from "./game";
 import Battle from "./Battle";
 import BossBattle from "./BossBattle";
+import { LectureRecorder, Podcast } from "./Listen";
 import { THEMES, PERKS, RANKS, FAQS, Flashcards, Matching, StatsPage, StudySheet, ExamRun, StreakPage, Faq, ShopPage, PlayerPage } from "./Pages";
 
 // Date.now() alone collides if two missions are made in the same millisecond.
@@ -31,6 +32,7 @@ export default function App() {
   const [examLoading, setExamLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [sheetId, setSheetId] = useState(null);
+  const [castId, setCastId] = useState(null);
   const [sheetLoading, setSheetLoading] = useState(false);
   const [slow, setSlow] = useState(false); // server cold-start hint
   const [examTimer, setExamTimer] = useState(0);
@@ -43,11 +45,13 @@ export default function App() {
   const plan = activeMission && !activeMission.exam ? activeMission.plan : null;
   const doneSections = activeMission?.doneSections ?? [];
   const sheetMission = missions.find((m) => m.id === sheetId) || null;
+  const castMission = missions.find((m) => m.id === castId) || null;
 
   function go(p) {
     setPage(p);
     setBattle(null);
     setSheetId(null);
+    setCastId(null);
     setMenuOpen(false);
   }
 
@@ -462,7 +466,7 @@ export default function App() {
 
         {page === "player" && <PlayerPage xp={xp} profile={profile} setProfile={setProfile} stats={stats} doneSections={doneSections} />}
 
-        {page === "home" && !activeMission && !battle && (
+        {page === "home" && !activeMission && !battle && !castMission && (
           <>
             <div className="hero-card">
               <h1>Your notes. Your mission.</h1>
@@ -483,6 +487,7 @@ export default function App() {
                 </label>
                 <span className="file-note">.txt or .md</span>
               </div>
+              <LectureRecorder onText={(t) => setNotes((n) => (n ? n + "\n" + t : t))} />
               <div className="row">
                 <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
                   <option value={1}>1 day sprint</option>
@@ -574,7 +579,7 @@ export default function App() {
           </>
         )}
 
-        {page === "home" && activeMission?.exam && !battle && (
+        {page === "home" && activeMission?.exam && !battle && !castMission && (
           <ExamRun
             key={activeMission.id}
             mission={activeMission}
@@ -593,11 +598,15 @@ export default function App() {
           />
         )}
 
+        {page === "home" && castMission && !battle && (
+          <Podcast mission={castMission} onBack={() => setCastId(null)} />
+        )}
+
         {page === "home" && sheetMission && !battle && (
           <StudySheet mission={sheetMission} onBack={() => setSheetId(null)} />
         )}
 
-        {page === "home" && plan && !battle && !sheetMission && (
+        {page === "home" && plan && !battle && !sheetMission && !castMission && (
           <>
             <div className="hero-card" style={{ padding: 18, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <h2>{activeMission.title}</h2>
@@ -605,6 +614,7 @@ export default function App() {
                 <button className="btn ghost" onClick={() => openSheet(activeMission)} disabled={sheetLoading}>
                   {sheetLoading ? "Summarizing…" : "Study sheet"}
                 </button>
+                <button className="btn ghost" onClick={() => setCastId(activeMission.id)}>Listen</button>
                 <button className="btn ghost" onClick={() => setActiveId(null)}>Library</button>
               </div>
             </div>
