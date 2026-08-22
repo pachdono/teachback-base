@@ -1,32 +1,52 @@
 import { useState, useEffect, useRef } from "react";
 import { API } from "./config";
 
-// Two browser features do all the work here, so there is no extra API cost:
-// SpeechRecognition turns a lecture into text, speechSynthesis reads a script
-// back out loud. Both are built into Chrome and Edge.
+// The browser does the work here. SpeechRecognition turns a lecture into
+// text and speechSynthesis reads a script back out loud.
 
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 export const canRecord = !!Recognition;
 export const canSpeak = typeof window !== "undefined" && "speechSynthesis" in window;
 
-// ---- Recording a lecture -------------------------------------------------
+// Recording a lecture
 
 export function LectureRecorder({ onText }) {
   const [live, setLive] = useState(false);
   const [heard, setHeard] = useState("");
+  const [review, setReview] = useState(null); // { url, text } once you stop
   const [error, setError] = useState("");
   const recRef = useRef(null);
   const finalRef = useRef("");
+  const interimRef = useRef("");
+  const mediaRef = useRef(null);
+  const chunksRef = useRef([]);
+  const streamRef = useRef(null);
 
-  function start() {
+  async function start() {
     if (!Recognition) return;
     setError("");
+    setReview(null);
     finalRef.current = "";
+    interimRef.current = "";
     setHeard("");
 
+    // Record the audio as well as the words, so you can play it back and check.
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      chunksRef.current = [];
+      const mr = new MediaRecorder(stream);
+      mr.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data); };
+      mr.start();
+      mediaRef.current = mr;
+    } catch {
+      setError("Microphone access was refused, so there is nothing to record.");
+      return;
+    }
+
     const rec = new Recognition();
-    rec.continuous = true;      // keep going through pauses
-    rec.interimResults = true;  // show words before the sentence is finished
+    rec.continuous = true;
+    rec.interimResults = true;
     rec.lang = "en-US";
 
     rec.onresult = (e) => {
@@ -36,14 +56,15 @@ export function LectureRecorder({ onText }) {
         if (e.results[i].isFinal) finalRef.current += chunk + " ";
         else interim += chunk;
       }
+      // Keep the unfinished words too. Stopping mid sentence used to lose them.
+      interimRef.current = interim;
       setHeard(finalRef.current + interim);
     };
 
-    // Chrome stops listening on its own after a silence, so restart while recording.
     rec.onend = () => { if (recRef.current) rec.start(); };
     rec.onerror = (e) => {
       if (e.error === "not-allowed") setError("Microphone access was refused.");
-      else if (e.error !== "no-speech") setError("Recording stopped: " + e.error);
+      else if (e.error !== "no-speech" && e.error !== "aborted") setError("Recording stopped: " + e.error);
     };
 
     recRef.current = rec;
@@ -56,33 +77,86 @@ export function LectureRecorder({ onText }) {
     recRef.current = null;
     if (rec) { rec.onend = null; rec.stop(); }
     setLive(false);
-    const text = finalRef.current.trim();
-    if (text) onText(text);
+
+    const mr = mediaRef.current;
+    mediaRef.current = null;
+    const text = (finalRef.current + interimRef.current).trim();
+
+    if (mr && mr.state !== "inactive") {
+      mr.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: mr.mimeType || "audio/webm" });
+        setReview({ url: URL.createObjectURL(blob), text });
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      };
+      mr.stop();
+    } else {
+      setReview({ url: null, text });
+    }
   }
 
-  useEffect(() => () => { if (recRef.current) { recRef.current.onend = null; recRef.current.stop(); } }, []);
+  function keep() {
+    if (review?.text.trim()) onText(review.text.trim());
+    if (review?.url) URL.revokeObjectURL(review.url);
+    setReview(null);
+    setHeard("");
+  }
 
-  if (!canRecord)
-    return <p className="sub" style={{ margin: 0 }}>Live transcription needs Chrome or Edge.</p>;
+  function discard() {
+    if (review?.url) URL.revokeObjectURL(review.url);
+    setReview(null);
+    setHeard("");
+  }
+
+  useEffect(() => () => {
+    if (recRef.current) { recRef.current.onend = null; recRef.current.stop(); }
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+  }, []);
+
+  if (!canRecord) return <span className="file-note">Recording needs Chrome or Edge.</span>;
+
+  if (review) {
+    return (
+      <div className="rec-review">
+        <p className="file-note">Check it before adding. You can fix any wrong words.</p>
+        {review.url && <audio className="rec-audio" src={review.url} controls />}
+        <textarea
+          className="rec-edit"
+          value={review.text}
+          onChange={(e) => setReview({ ...review, text: e.target.value })}
+          aria-label="What was recorded"
+        />
+        <div className="row" style={{ marginTop: 0 }}>
+          <button type="button" className="btn sm" onClick={keep} disabled={!review.text.trim()}>
+            Add to notes
+          </button>
+          <button type="button" className="btn ghost sm" onClick={discard}>Discard</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <div className="row" style={{ marginTop: 0 }}>
-        {live ? (
-          <button type="button" className="btn gold" onClick={stop}>Stop and use this</button>
-        ) : (
-          <button type="button" className="btn" onClick={start}>Record a lecture</button>
-        )}
-        {live && <span className="rec-dot" aria-hidden="true" />}
-        {live && <span className="sub">Listening…</span>}
-      </div>
-      {heard && <p className="rec-heard">{heard}</p>}
+    <>
+      {live ? (
+        <button type="button" className="btn sm rec-btn live" onClick={stop}>
+          <span className="rec-glyph stop" aria-hidden="true">&#9632;</span>
+          Stop recording
+        </button>
+      ) : (
+        <button type="button" className="btn sm rec-btn" onClick={start}>
+          <span className="rec-glyph" aria-hidden="true">&#9679;</span>
+          Record a lecture
+        </button>
+      )}
+      {live && <span className="file-note rec-status">Listening</span>}
+      {live && heard && <p className="rec-heard">{heard}</p>}
       {error && <div className="error">{error}</div>}
-    </div>
+    </>
   );
 }
 
-// ---- Listening to an episode --------------------------------------------
+// Listening to an episode
 
 export function Podcast({ mission, onBack }) {
   const [script, setScript] = useState(mission.podcast || null);
@@ -132,7 +206,7 @@ export function Podcast({ mission, onBack }) {
   }
 
   function speakFrom(i) {
-    if (!script || i >= script.lines.length) { setPlaying(false); setAt(-1); return; }
+    if (!script || i >= script.lines.length) { setPlaying(false); return; }
     const line = script.lines[i];
     const u = new SpeechSynthesisUtterance(line.text);
     const wanted = line.speaker === "guest" ? guestVoice : hostVoice;
@@ -144,19 +218,20 @@ export function Podcast({ mission, onBack }) {
     window.speechSynthesis.speak(u);
   }
 
-  function play() {
+  // Starting point for the play button. Stopping keeps it, so you resume
+  // where you left off instead of going back to the beginning.
+  function playFrom(i) {
     if (!script) return;
     stopped.current = false;
     setPlaying(true);
     window.speechSynthesis.cancel();
-    speakFrom(0);
+    speakFrom(i);
   }
 
   function stop() {
     stopped.current = true;
     window.speechSynthesis.cancel();
     setPlaying(false);
-    setAt(-1);
   }
 
   useEffect(() => () => { stopped.current = true; window.speechSynthesis.cancel(); }, []);
@@ -169,13 +244,13 @@ export function Podcast({ mission, onBack }) {
 
       <div className="hero-card">
         <h1>{script?.title || mission.title}</h1>
-        <p className="sub">A short episode about this material, read out loud. Useful when you can't look at a screen.</p>
+        <p className="sub">This material as a short talk you can listen to instead of reading.</p>
 
         {!canSpeak && <div className="error">This browser can't read text aloud. Try Chrome or Edge.</div>}
 
         {!script && (
           <button className="btn gold" disabled={loading} onClick={build}>
-            {loading ? "Writing the episode…" : "Create episode"}
+            {loading ? "Writing the episode" : "Create episode"}
           </button>
         )}
 
@@ -199,17 +274,31 @@ export function Podcast({ mission, onBack }) {
             </div>
 
             <div className="row">
-              {playing
-                ? <button className="btn" onClick={stop}>Stop</button>
-                : <button className="btn gold" onClick={play}>Play episode</button>}
+              {playing ? (
+                <button className="btn" onClick={stop}>
+                  <span className="rec-glyph stop" aria-hidden="true">&#9632;</span>
+                  Pause
+                </button>
+              ) : (
+                <button className="btn gold" onClick={() => playFrom(at < 0 ? 0 : at)}>
+                  <span className="rec-glyph play" aria-hidden="true">&#9654;</span>
+                  {at > 0 ? "Resume" : "Play episode"}
+                </button>
+              )}
+              <span className="file-note">Tap any line to start from there.</span>
             </div>
 
             <div className="script">
               {script.lines.map((l, i) => (
-                <p key={i} className={`script-line ${l.speaker} ${i === at ? "now" : ""}`}>
+                <button
+                  type="button"
+                  key={i}
+                  className={`script-line ${l.speaker} ${i === at ? "now" : ""}`}
+                  onClick={() => playFrom(i)}
+                >
                   <span className="who">{l.speaker === "guest" ? "Student" : "Teacher"}</span>
                   {l.text}
-                </p>
+                </button>
               ))}
             </div>
           </>

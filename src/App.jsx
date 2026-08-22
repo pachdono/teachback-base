@@ -4,8 +4,11 @@ import { Icon, SpaceDecor } from "./ui";
 import { PixelSprite } from "./sprites";
 import { sfx, setMasterVolume, loadSave, SAVE, localDate, shuffle, shuffleOptions, QUEST_GOAL, QUEST_XP } from "./game";
 import Battle from "./Battle";
-import BossBattle from "./BossBattle";
+import BossBattle, { CutScene } from "./BossBattle";
+import Classroom from "./Classroom";
 import { LectureRecorder, Podcast } from "./Listen";
+import { AccountPage } from "./Account";
+import { supabase, cloudOn, loadSave as cloudLoad, pushSave, pushScore } from "./supabase";
 import { THEMES, PERKS, RANKS, FAQS, Flashcards, Matching, StatsPage, StudySheet, ExamRun, StreakPage, Faq, ShopPage, PlayerPage } from "./Pages";
 
 // Date.now() alone collides if two missions are made in the same millisecond.
@@ -33,6 +36,8 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [sheetId, setSheetId] = useState(null);
   const [castId, setCastId] = useState(null);
+  const [user, setUser] = useState(null);
+  const [synced, setSynced] = useState(false);
   const [sheetLoading, setSheetLoading] = useState(false);
   const [slow, setSlow] = useState(false); // server cold-start hint
   const [examTimer, setExamTimer] = useState(0);
@@ -68,7 +73,7 @@ export default function App() {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      if (!data.sections) throw new Error("Unexpected response — restart the server with the new code");
+      if (!data.sections) throw new Error("Unexpected response. Restart the server.");
       setMissions((ms) => ms.map((x) => (x.id === m.id ? { ...x, summary: data } : x)));
       setSheetId(m.id);
     } catch (err) {
@@ -160,6 +165,41 @@ export default function App() {
 
   useEffect(() => { setMasterVolume(profile.volume ?? 0.7); }, [profile.volume]);
 
+  // Who is signed in. Runs once, then on every sign in or sign out.
+  useEffect(() => {
+    if (!cloudOn) return;
+    supabase.auth.getUser().then(({ data }) => setUser(data?.user ?? null));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user ?? null);
+      setSynced(false);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  // On sign in, take whichever save has more XP. The local one may be ahead if
+  // you played signed out, the cloud one may be ahead if you played elsewhere.
+  useEffect(() => {
+    if (!cloudOn || !user || synced) return;
+    let cancelled = false;
+    cloudLoad(user.id)
+      .then((remote) => {
+        if (cancelled || !remote) { setSynced(true); return; }
+        if ((remote.xp ?? 0) > xp) {
+          setXp(remote.xp ?? 0);
+          if (remote.profile) setProfile(remote.profile);
+          if (remote.streak) setStreak(remote.streak);
+          if (remote.missions) setMissions(remote.missions);
+          if (remote.stats) setStats(remote.stats);
+          if (remote.quest) setQuest(remote.quest);
+          if (remote.activeId !== undefined) setActiveId(remote.activeId);
+        }
+        setSynced(true);
+      })
+      .catch(() => setSynced(true));
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, synced]);
+
   const [streak, setStreak] = useState(() => SAVE.streak || { count: 0, last: null });
 
   const [saveWarning, setSaveWarning] = useState("");
@@ -174,11 +214,26 @@ export default function App() {
     }
   }, [xp, profile, streak, missions, activeId, stats, quest]);
 
+  // Send the save up, but wait for a pause first so a fast run of wins is one write.
+  useEffect(() => {
+    if (!cloudOn || !user || !synced) return;
+    const t = setTimeout(() => {
+      const save = { xp, profile, streak, missions, activeId, stats, quest };
+      pushSave(user.id, save).catch(() => {});
+      pushScore(user.id, profile.name, xp).catch(() => {});
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [xp, profile, streak, missions, activeId, stats, quest, user, synced]);
+
   useEffect(() => {
     const t = THEMES.find((x) => x.id === profile.theme) || THEMES[0];
     const s = document.documentElement.style;
     s.setProperty("--purple", t.c1);
     s.setProperty("--purple2", t.c2);
+    // the world behind everything, not just the accent colour
+    if (t.bg1) s.setProperty("--bg", t.bg1);
+    if (t.bg2) s.setProperty("--bg-lift", t.bg2);
+    if (t.star) s.setProperty("--star", t.star);
   }, [profile.theme]);
 
   // pointer-tracking 3D tilt on cards
@@ -225,16 +280,39 @@ export default function App() {
   }
 
   const progressMsg = slow
-    ? "Waking the ship's engines — the first launch of the day can take a minute…"
-    : progress < 30 ? "Scanning your notes…" :
-      progress < 60 ? "Forging enemies…" :
-      progress < 90 ? "Charting your mission…" :
-      "Almost there…";
+    ? "Waking the ship's engines. The first launch of the day can take a minute."
+    : progress < 30 ? "Scanning your notes" :
+      progress < 60 ? "Forging enemies" :
+      progress < 90 ? "Charting your mission" :
+      "Almost there";
 
-  function handleFile(e) {
+  async function handleFile(e) {
     const file = e.target.files[0];
     if (!file) return;
     e.target.value = "";
+
+    if (file.name.toLowerCase().endsWith(".pdf")) {
+      try {
+        setError("");
+        const buf = await file.arrayBuffer();
+        const pdfjs = await import("pdfjs-dist");
+        const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
+        pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+        const doc = await pdfjs.getDocument({ data: buf }).promise;
+        let text = "";
+        for (let p = 1; p <= doc.numPages; p++) {
+          const page = await doc.getPage(p);
+          const content = await page.getTextContent();
+          text += content.items.map((it) => it.str).join(" ") + "\n";
+        }
+        if (!text.trim()) throw new Error("no selectable text found, so it may be a scan");
+        setNotes((n) => (n + "\n" + text.trim()).trim());
+      } catch (err) {
+        setError("Couldn't read that PDF: " + err.message);
+      }
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = () => setNotes((n) => (n + "\n" + reader.result).trim());
     reader.readAsText(file);
@@ -257,7 +335,7 @@ export default function App() {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      if (!data.days) throw new Error("Unexpected response — restart the server with the new code");
+      if (!data.days) throw new Error("Unexpected response. Restart the server.");
       setProgress(100);
       const mission = {
         id: newId(),
@@ -292,7 +370,7 @@ export default function App() {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      if (!data.questions?.length) throw new Error("Unexpected response — restart the server with the new code");
+      if (!data.questions?.length) throw new Error("Unexpected response. Restart the server.");
       const mission = {
         id: newId(),
         exam: true,
@@ -403,10 +481,17 @@ export default function App() {
         <button className={`nav-btn ${page === "player" ? "active" : ""}`} onClick={() => go("player")}>
           <Icon name="player" /> Player
         </button>
+        {cloudOn && (
+          <button className={`nav-btn ${page === "account" ? "active" : ""}`} onClick={() => go("account")}>
+            <Icon name="about" /> {user ? "Account" : "Sign in"}
+          </button>
+        )}
         <div className="side-xp tnum" aria-label={`${xp} experience points`}>{xp} XP</div>
       </aside>
 
       <main className="main">
+        {page === "account" && <AccountPage user={user} onBack={() => go("home")} />}
+
         {page === "about" && (
           <>
             <div className="row" style={{ marginTop: 0, marginBottom: 14 }}>
@@ -418,7 +503,7 @@ export default function App() {
                 TeachBack was created by Dono and Casper, two students at
                 HackHarvard Hangzhou 2026. We noticed a problem every student
                 faces: hours of studying with no way to know if you actually
-                understand. So we turned studying into a space adventure — and
+                understand. So we turned studying into a space adventure, and
                 made the final exam a boss you can only beat by teaching.
               </p>
             </div>
@@ -426,7 +511,7 @@ export default function App() {
               <div className="about-card">
                 <Icon name="file" size={22} />
                 <h3>Paste anything</h3>
-                <p>Notes, textbook pages, vocab lists — our AI turns them into a mission across days.</p>
+                <p>Notes, textbook pages, vocab lists. Our AI turns them into a mission across days.</p>
               </div>
               <div className="about-card">
                 <Icon name="rocket" size={22} />
@@ -441,7 +526,7 @@ export default function App() {
               <div className="about-card">
                 <Icon name="flame" size={22} />
                 <h3>The final boss</h3>
-                <p>Explain everything in your own words. An AI grades you — the Feynman technique as a game.</p>
+                <p>Explain everything in your own words. An AI grades you. The Feynman technique, as a game.</p>
               </div>
             </div>
             <div className="hero-card" style={{ marginTop: 16 }}>
@@ -477,17 +562,17 @@ export default function App() {
               <textarea
                 rows={8}
                 aria-label="Study notes"
-                placeholder="Paste your study notes here…"
+                placeholder="Paste your study notes here"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />
               <div className="row">
                 <label className="upload-label">Upload notes
-                  <input type="file" accept=".txt,.md" onChange={handleFile} hidden />
+                  <input type="file" accept=".txt,.md,.pdf" onChange={handleFile} hidden />
                 </label>
-                <span className="file-note">.txt or .md</span>
+                <span className="file-note">.txt, .md or .pdf</span>
+                <LectureRecorder onText={(t) => setNotes((n) => (n ? n + "\n" + t : t))} />
               </div>
-              <LectureRecorder onText={(t) => setNotes((n) => (n ? n + "\n" + t : t))} />
               <div className="row">
                 <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
                   <option value={1}>1 day sprint</option>
@@ -496,7 +581,7 @@ export default function App() {
                   <option value={14}>2 weeks</option>
                 </select>
                 <button className="btn" onClick={buildPlan} disabled={loading || !notes.trim()}>
-                  {loading ? "Building your mission…" : "Launch mission"}
+                  {loading ? "Building your mission" : "Launch mission"}
                 </button>
               </div>
               {loading && (
@@ -513,12 +598,12 @@ export default function App() {
             <div className="hero-card" style={{ marginTop: 16 }}>
               <h2>Instant mock exam</h2>
               <p className="sub" style={{ marginBottom: 10 }}>
-                No notes needed — name any topic and get a full practice exam with explanations.
+                No notes needed. Name any topic and get a full practice exam with explanations.
               </p>
               <input
                 type="text"
                 aria-label="Exam topic"
-                placeholder="e.g. SSAT math — long division and remainders"
+                placeholder="e.g. SSAT math, long division and remainders"
                 value={examTopic}
                 onChange={(e) => setExamTopic(e.target.value)}
               />
@@ -534,11 +619,11 @@ export default function App() {
                   <option value={60}>60s per question</option>
                 </select>
                 <button className="btn" onClick={buildExam} disabled={examLoading || loading || !examTopic.trim()}>
-                  {examLoading ? "Writing your exam…" : "Create exam"}
+                  {examLoading ? "Writing your exam" : "Create exam"}
                 </button>
               </div>
               {examLoading && slow && (
-                <div className="progress-msg" style={{ marginTop: 12 }}>Waking the ship's engines — the first launch of the day can take a minute…
+                <div className="progress-msg" style={{ marginTop: 12 }}>Waking the ship's engines. The first launch of the day can take a minute.
                 </div>
               )}
             </div>
@@ -612,7 +697,7 @@ export default function App() {
               <h2>{activeMission.title}</h2>
               <div className="row" style={{ margin: 0 }}>
                 <button className="btn ghost" onClick={() => openSheet(activeMission)} disabled={sheetLoading}>
-                  {sheetLoading ? "Summarizing…" : "Study sheet"}
+                  {sheetLoading ? "Summarizing" : "Study sheet"}
                 </button>
                 <button className="btn ghost" onClick={() => setCastId(activeMission.id)}>Listen</button>
                 <button className="btn ghost" onClick={() => setActiveId(null)}>Library</button>
@@ -620,16 +705,16 @@ export default function App() {
             </div>
             {error && <div className="error">{error}</div>}
             {missCount >= 3 && !ambushReady && (
-              <div className="ninja-warn">The Ninja is watching… {5 - missCount} more {5 - missCount === 1 ? "miss" : "misses"} and he strikes!
+              <div className="ninja-warn">The Ninja is watching {5 - missCount} more {5 - missCount === 1 ? "miss" : "misses"} and he strikes!
               </div>
             )}
             {ambushReady && (
-              <div className="ninja-warn hot">The Ninja blocks your path — your next battle is an AMBUSH! Defeat him to reach the boss.
+              <div className="ninja-warn hot">The Ninja blocks your path. Your next battle is an AMBUSH! Defeat him to reach the boss.
               </div>
             )}
             {plan.days.map((d, di) => (
               <div key={di}>
-                <div className="day-label">DAY {d.day} — {d.title}</div>
+                <div className="day-label">DAY {d.day} · {d.title}</div>
                 {d.sections.map((s, si) => {
                   const id = `${di}-${si}`;
                   const done = doneSections.includes(id);
@@ -654,11 +739,32 @@ export default function App() {
                 <h3>FINAL BOSS</h3>
                 <p>Teach it back in your own words. The AI grades you.</p>
               </button>
+              {activeMission?.bossBeaten && (
+                <button type="button" className="boss-card class-card" onClick={() => setBattle({ classroom: true })}>
+                  <div className="boss-card-pixel class-card-kids">
+                    <PixelSprite id="bob" size={44} />
+                    <PixelSprite id="max" size={44} />
+                    <PixelSprite id="einstein" size={44} />
+                  </div>
+                  <h3>YOUR CLASSROOM</h3>
+                  <p>Four students, four questions. Explain until they get it.</p>
+                </button>
+              )}
             </div>
           </>
         )}
 
-        {battle && !battle.boss && !battle.mode && (
+        {battle?.classroom && (
+          <Classroom
+            mission={activeMission}
+            character={profile.character}
+            onStat={recordStat}
+            onDone={(xp) => { setXp((x) => x + xp); bumpQuest(); setBattle(null); }}
+            onExit={() => setBattle(null)}
+          />
+        )}
+
+        {battle && !battle.boss && !battle.classroom && !battle.mode && (
           <div className="hero-card">
             <h1>{section.title}</h1>
             <p className="sub">Choose how you want to train:</p>
@@ -694,19 +800,19 @@ export default function App() {
             accent="#ff2e3f"
             sprite={<PixelSprite id="ninja" size={120} />}
             lines={battle.ambush ? [
-              "Five questions dropped… I felt every one.",
+              "Five questions dropped I felt every one.",
               "You will not face the Void Lord unworthy.",
-              "Prove yourself here — or fall.",
+              "Prove yourself here, or fall.",
             ] : [
-              "You dropped these questions, scholar…",
+              "You dropped these questions, scholar",
               "I sharpened every one into a blade.",
-              "Take them back — if you can.",
+              "Take them back, if you can.",
             ]}
             onDone={() => setBattle((b) => ({ ...b, cut: true }))}
           />
         )}
 
-        {battle && !battle.boss && (battle.mode === "quiz" || battle.mode === "speed") && (!battle.revenge || battle.cut) && (
+        {battle && !battle.boss && !battle.classroom && (battle.mode === "quiz" || battle.mode === "speed") && (!battle.revenge || battle.cut) && (
           <Battle
             key={battle.revenge ? "revenge" : battle.mode + battle.dayIdx + "-" + battle.secIdx}
             section={section}
@@ -740,7 +846,7 @@ export default function App() {
           />
         )}
 
-        {battle && !battle.boss && battle.mode === "cards" && (
+        {battle && !battle.boss && !battle.classroom && battle.mode === "cards" && (
           <Flashcards
             section={section}
             onStat={(q, ok) => recordStat(section.title, q, ok, activeMission?.title)}
@@ -749,7 +855,7 @@ export default function App() {
           />
         )}
 
-        {battle && !battle.boss && battle.mode === "match" && (
+        {battle && !battle.boss && !battle.classroom && battle.mode === "match" && (
           <Matching
             section={section}
             onStat={(q, ok) => recordStat(section.title, q, ok, activeMission?.title)}
@@ -766,7 +872,10 @@ export default function App() {
             onStat={(q, ok) => recordStat("Boss brawl", q, ok, activeMission?.title)}
             onDone={(xpGain, reviewQs, wonBrawl) => {
               setXp((x) => x + xpGain);
-              if (wonBrawl) bumpQuest();
+              if (wonBrawl) {
+                bumpQuest();
+                setMissions((ms) => ms.map((m) => (m.id === activeId ? { ...m, bossBeaten: true } : m)));
+              }
               reviewQs.forEach((rq) => recordStat("Boss review", rq, false, activeMission?.title));
               setBattle(null);
             }}

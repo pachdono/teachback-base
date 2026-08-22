@@ -150,7 +150,7 @@ function VoidGauntlet({ phase = 1, character, onResolve }) {
 
   return (
     <div className="gauntlet">
-      <div className="gauntlet-label">VOID GAUNTLET — reach the dark! <span className="dodge-keys">WASD / arrows</span>
+      <div className="gauntlet-label">VOID GAUNTLET, reach the dark! <span className="dodge-keys">WASD / arrows</span>
         <span className="wave-dots">{Array.from({ length: waveCount }, (_, i) => (
           <span key={i} className={`wave-dot ${i < wave ? "on" : ""}`} />
         ))}</span>
@@ -198,7 +198,7 @@ function BossBattle({ topics, character, questions, onStat, onDone, onExit }) {
   const [typed, setTyped] = useState("");
   const [shotKey, setShotKey] = useState(0);
   const [flinchKey, setFlinchKey] = useState(0);
-  const [bossAtk, setBossAtk] = useState(null); // {type, key} — landed attack
+  const [bossAtk, setBossAtk] = useState(null); // {type, key}, landed attack
   const [dodgedKey, setDodgedKey] = useState(0);
   const [combo, setCombo] = useState(0);
   const [barrage, setBarrage] = useState(null); // {key, hits, combo, dmg}
@@ -282,7 +282,7 @@ function BossBattle({ topics, character, questions, onStat, onDone, onExit }) {
       setBarrage({ key: Date.now(), hits, combo: nc, dmg });
       setTimeout(beginAction, 1000);
     } else {
-      // wrong answer: combo breaks, the Void Gauntlet opens — survive it!
+      // wrong answer: combo breaks, the Void Gauntlet opens, survive it!
       sfx("hurt");
       setCombo(0);
       setBarrage(null);
@@ -318,7 +318,7 @@ function BossBattle({ topics, character, questions, onStat, onDone, onExit }) {
         accent="#a78bfa"
         sprite={<div className="cut-boss-pixel"><PixelSprite id="voidlord" size={128} /></div>}
         lines={[
-          "So… you think you've learned something.",
+          "So you think you've learned something.",
           "Teach me, little scholar. Convince me.",
           "Then survive my lessons.",
         ]}
@@ -342,13 +342,13 @@ function BossBattle({ topics, character, questions, onStat, onDone, onExit }) {
           </div>
         </div>
         <div className="question">
-          Teach it back — explain everything you've learned in your own words.
+          Teach it back, explain everything you've learned in your own words.
           The better you teach, <b>the stronger your weapon charges</b> for the brawl.
         </div>
         <textarea
           rows={8}
           aria-label="Your explanation"
-          placeholder="Pretend you're teaching this to a friend who knows nothing about it…"
+          placeholder="Pretend you're teaching this to a friend who knows nothing about it"
           value={explanation}
           onChange={(e) => setExplanation(e.target.value)}
         />
@@ -356,7 +356,7 @@ function BossBattle({ topics, character, questions, onStat, onDone, onExit }) {
         <div className="row" style={{ marginTop: 14 }}>
           <button className="btn ghost" onClick={onExit}>Retreat</button>
           <button className="btn" onClick={submit} disabled={loading || explanation.trim().length < 30}>
-            {loading ? "The boss is judging you…" : "Unleash your explanation"}
+            {loading ? "The boss is judging you" : "Unleash your explanation"}
           </button>
         </div>
       </div>
@@ -368,7 +368,7 @@ function BossBattle({ topics, character, questions, onStat, onDone, onExit }) {
         <div className="center-card" style={{ padding: "10px 0 0" }}>
                     <h2 className="tnum">Weapon charged to {Math.round(mult * 100)}%</h2>
           <p className="sub" style={{ margin: "6px 0 0" }}>
-            Your explanation scored {grade.score}/100 — every correct answer in the brawl hits for {Math.round(20 * mult)} damage.
+            Your explanation scored {grade.score}/100, every correct answer in the brawl hits for {Math.round(20 * mult)} damage.
           </p>
         </div>
         {grade.correct?.length > 0 && (
@@ -412,11 +412,11 @@ function BossBattle({ topics, character, questions, onStat, onDone, onExit }) {
             <div className="player-fallen" aria-hidden="true"><PixelSprite id={character} size={72} /></div>
           </>
         )}
-        <h2 className={won ? "big-pop" : "defeat-title"}>{won ? "THE VOID LORD FALLS!" : "The Void Lord survives…"}</h2>
+        <h2 className={won ? "big-pop" : "defeat-title"}>{won ? "THE VOID LORD FALLS!" : "The Void Lord survives"}</h2>
         <p className="sub" style={{ margin: "8px 0 0" }}>
           {won
             ? `Victory with ${hearts} ${hearts === 1 ? "heart" : "hearts"} to spare. A true scholar-warrior.`
-            : "Study your weak spots and return stronger — the Ninja holds your missed questions."}
+            : "Study your weak spots and return stronger, the Ninja holds your missed questions."}
         </p>
         {grade?.followUp && (
           <div className="explain" style={{ marginTop: 14 }}>
@@ -438,7 +438,7 @@ function BossBattle({ topics, character, questions, onStat, onDone, onExit }) {
     <div className={`battle brawl bphase-${bossPhase} ${bossAtk ? "rumble" : ""}`}>
       {shownPhase > 1 && (
         <div key={`pb${shownPhase}`} className="phase-banner" aria-hidden="true">
-          {shownPhase === 2 ? "PHASE 2 — THE VOID AWAKENS" : "FINAL PHASE — OBLIVION NEARS"}
+          {shownPhase === 2 ? "PHASE 2, THE VOID AWAKENS" : "FINAL PHASE, OBLIVION NEARS"}
         </div>
       )}
       {shownPhase > 1 && <div key={`pf${shownPhase}`} className="phase-flash" aria-hidden="true" />}
@@ -486,7 +486,7 @@ function BossBattle({ topics, character, questions, onStat, onDone, onExit }) {
 
       <div className="brawl-q">
         {mode === "action" && (
-          <div className="brawl-wait">{nextAtk.name} is charging — answer the next question to counter it!</div>
+          <div className="brawl-wait">{nextAtk.name} is charging, answer the next question to counter it!</div>
         )}
         {mode === "dodge" && (
           <VoidGauntlet
@@ -526,7 +526,7 @@ function BossBattle({ topics, character, questions, onStat, onDone, onExit }) {
               <div className="row">
                 <input
                   type="text"
-                  placeholder="Type your answer…"
+                  placeholder="Type your answer"
                   value={typed}
                   onChange={(e) => setTyped(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && typed.trim() && mode === "question") answerQ(isRightAnswer(q, typed)); }}
@@ -548,3 +548,4 @@ function BossBattle({ topics, character, questions, onStat, onDone, onExit }) {
 }
 
 export default BossBattle;
+export { CutScene, VoidGauntlet, genVoidZones };

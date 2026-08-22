@@ -1,14 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PixelSprite, CHARACTERS } from "./sprites";
 import { sfx, answerText, isRightAnswer, letterHint, shuffle, shuffleOptions, localDate, QUEST_GOAL, QUEST_XP } from "./game";
 import { Icon, FlameArt } from "./ui";
 
 const THEMES = [
-  { id: "nebula", name: "Nebula", desc: "The classic TeachBack purple.", c1: "#7c5cff", c2: "#a78bfa", cost: 0 },
-  { id: "solar", name: "Solar Flare", desc: "Burning orange for bold pilots.", c1: "#f0762e", c2: "#ffb56b", cost: 50 },
-  { id: "alien", name: "Alien Bloom", desc: "Toxic green, fresh from the hive.", c1: "#1fa46c", c2: "#3ddc97", cost: 50 },
-  { id: "crimson", name: "Red Giant", desc: "A dying star's last light.", c1: "#e5484d", c2: "#ff8f92", cost: 50 },
-  { id: "ocean", name: "Deep Ocean", desc: "Cool blue from a water world.", c1: "#0e8fd9", c2: "#7dd3fc", cost: 50 },
+  // c1 and c2 are the accent colours. bg1 and bg2 are the deep space colours
+  // behind everything, and star tints the stars so each world feels different.
+  { id: "nebula", name: "Nebula", desc: "Deep violet space, the classic run.", cost: 0,
+    c1: "#7c5cff", c2: "#a78bfa", bg1: "#0b0a1f", bg2: "#161034", star: "#ffffff" },
+  { id: "solar", name: "Desert Sun", desc: "A scorched world under a red giant.", cost: 50,
+    c1: "#f0762e", c2: "#ffb56b", bg1: "#1a0d06", bg2: "#3a1a08", star: "#ffd9a8" },
+  { id: "alien", name: "Alien Bloom", desc: "A jungle moon that glows at night.", cost: 50,
+    c1: "#1fa46c", c2: "#3ddc97", bg1: "#04150f", bg2: "#0a2c1e", star: "#c9ffe6" },
+  { id: "crimson", name: "Red Giant", desc: "A dying star's last light.", cost: 50,
+    c1: "#e5484d", c2: "#ff8f92", bg1: "#180608", bg2: "#360b12", star: "#ffd2d4" },
+  { id: "ocean", name: "Deep Ocean", desc: "Under the ice of a water world.", cost: 50,
+    c1: "#0e8fd9", c2: "#7dd3fc", bg1: "#03121f", bg2: "#062942", star: "#d6f2ff" },
 ];
 
 const PERKS = [
@@ -20,9 +27,9 @@ const RANKS = ["Space Cadet", "Star Pilot", "Nova Knight", "Galaxy Commander", "
 
 const FAQS = [
   { q: "How does TeachBack build my mission?", a: "An AI reads your notes and splits them into daily sections, each with battle questions generated straight from your material." },
-  { q: "What is the final boss?", a: "The Feynman technique in disguise. You explain the whole topic in your own words and the AI grades your explanation out of 100 — teaching something is the ultimate test of understanding it." },
+  { q: "What is the final boss?", a: "The Feynman technique in disguise. You explain the whole topic in your own words and the AI grades your explanation out of 100, teaching something is the ultimate test of understanding it." },
   { q: "How do I earn XP?", a: "Win quiz battles (15 XP), speed rounds (20 XP), flashcard decks and matching games (10 XP each), and boss fights (up to 100 XP). Spend it in the Shop on themes and perks." },
-  { q: "What happens when I get a question wrong?", a: "You lose a heart, but you also get the method — a step-by-step explanation of how to reach the answer — and the question comes back until you beat it." },
+  { q: "What happens when I get a question wrong?", a: "You lose a heart, but you also get the method, a step-by-step explanation of how to reach the answer, and the question comes back until you beat it." },
   { q: "Is my progress saved?", a: "Your XP, name, avatar and shop purchases are saved in your browser. Mission plans are rebuilt fresh from your notes each session." },
   { q: "What files can I upload?", a: ".txt and .md files. For PDFs, copy and paste the text for now." },
 ];
@@ -159,7 +166,7 @@ function StatsPage({ stats, topics, onRevenge }) {
         <div style={{ flex: 1 }}>
           <h2>Revenge Round</h2>
           <p className="sub" style={{ margin: "4px 0 0" }}>
-            The Ninja guards your missed questions, topic by topic. Clear a topic to take it back — +25 XP each. Beware: it enrages halfway.
+            The Ninja guards your missed questions, topic by topic. Clear a topic to take it back, +25 XP each. Beware: it enrages halfway.
           </p>
         </div>
       </div>
@@ -230,7 +237,7 @@ function StatsPage({ stats, topics, onRevenge }) {
           <ul className="result-list">
             {missed.map(([qText, v]) => {
               const pct = Math.round((v.wrong / (v.right + v.wrong)) * 100);
-              return <li key={qText}><b>{pct}% wrong</b> ({v.wrong + v.right} tries) — {qText}</li>;
+              return <li key={qText}><b>{pct}% wrong</b> ({v.wrong + v.right} tries), {qText}</li>;
             })}
           </ul>
         </div>
@@ -342,9 +349,9 @@ function ExamRun({ mission, onStat, onFinish, onExit }) {
     return (
       <div className="battle">
         <div className="center-card" style={{ padding: "10px 0 4px" }}>
-                    <h2 className="tnum">{pct}% — {right}/{qs.length} correct</h2>
+                    <h2 className="tnum">{pct}%, {right}/{qs.length} correct</h2>
           <p className="sub" style={{ margin: "6px 0 0" }}>
-            {pct >= 80 ? "Exam crushed. You're ready." : pct >= 50 ? "Solid — review the misses below and retake it." : "Rough one — study the explanations below, then try again."}
+            {pct >= 80 ? "Exam crushed. You're ready." : pct >= 50 ? "Solid, review the misses below and retake it." : "Rough one, study the explanations below, then try again."}
           </p>
         </div>
         {missed.length > 0 && (
@@ -352,7 +359,7 @@ function ExamRun({ mission, onStat, onFinish, onExit }) {
             <h3 style={{ marginTop: 14, color: "#e5484d" }}>Review your misses:</h3>
             <ul className="result-list">
               {missed.map((m, idx) => (
-                <li key={idx}><b>{m.question}</b> — {answerText(m)}
+                <li key={idx}><b>{m.question}</b>, {answerText(m)}
                   {m.explanation && <div style={{ color: "#a5a0c4", marginTop: 3 }}>{m.explanation}</div>}
                 </li>
               ))}
@@ -399,7 +406,7 @@ function ExamRun({ mission, onStat, onFinish, onExit }) {
         <div className="row">
           <input
             type="text"
-            placeholder="Type your answer…"
+            placeholder="Type your answer"
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
             onKeyDown={(e) => {
@@ -472,7 +479,7 @@ function StreakPage({ streak, setStreak, setXp, quest, onQuestClaim }) {
                 ? "Streak secured for today. See you tomorrow, pilot!"
                 : shown > 0
                   ? "Claim now to keep the fire burning!"
-                  : "Start a streak — learn something every day."}
+                  : "Start a streak, learn something every day."}
             </div>
             <div className="row">
               <button className="btn gold tnum" disabled={claimedToday} onClick={claim}>
@@ -491,7 +498,7 @@ function StreakPage({ streak, setStreak, setXp, quest, onQuestClaim }) {
       <div className="hero-card" style={{ marginTop: 16 }}>
         <h2>Daily quest</h2>
         <p className="sub" style={{ marginBottom: 10 }}>
-          Win {QUEST_GOAL} battles today — quiz, speed, revenge and exams all count.
+          Win {QUEST_GOAL} battles today, quiz, speed, revenge and exams all count.
         </p>
         <div className="level-row tnum">{Math.min(quest.wins, QUEST_GOAL)}/{QUEST_GOAL} wins</div>
         <div className="level-track">
@@ -506,7 +513,7 @@ function StreakPage({ streak, setStreak, setXp, quest, onQuestClaim }) {
 
       <div className="hero-card" style={{ marginTop: 16 }}>
         <h2>Streak rewards</h2>
-        <p className="sub" style={{ marginBottom: 0 }}>Daily XP grows with your streak — up to 40 XP a day from day 7.</p>
+        <p className="sub" style={{ marginBottom: 0 }}>Daily XP grows with your streak, up to 40 XP a day from day 7.</p>
         <div className="mile-row">
           {[1, 2, 3, 4, 5, 6, 7].map((d) => (
             <span key={d} className={`mile tnum ${shown >= d ? "hit" : ""}`}>
@@ -570,14 +577,14 @@ function ShopPage({ xp, setXp, profile, setProfile }) {
       </div>
 
       <div className="hero-card" style={{ marginTop: 16 }}>
-        <h2>Ship paint — themes</h2>
+        <h2>Ship paint, themes</h2>
         <div className="shop-grid">
           {THEMES.map((t) => {
             const owned = profile.owned.includes(t.id);
             const equipped = profile.theme === t.id;
             return (
               <div className={`shop-card ${equipped ? "equipped" : ""}`} key={t.id}>
-                <div className="swatch" style={{ background: `linear-gradient(135deg, ${t.c1}, ${t.c2})` }} />
+                <div className="swatch" style={{ background: `linear-gradient(160deg, ${t.bg2} 0%, ${t.c1} 55%, ${t.c2} 100%)` }} />
                 <h3>{t.name}</h3>
                 <p className="desc">{t.desc}</p>
                 <div className="shop-row">
@@ -640,7 +647,7 @@ function PlayerPage({ xp, profile, setProfile, stats, doneSections }) {
   return (
     <>
       <div className="hero-card player-head">
-        <div className="avatar-big" aria-hidden="true"><ComicArt id={profile.character} size={76} /></div>
+        <div className="avatar-big" aria-hidden="true"><PixelSprite id={profile.character} size={76} /></div>
         <div className="player-info">
           <input
             type="text"
@@ -672,7 +679,7 @@ function PlayerPage({ xp, profile, setProfile, stats, doneSections }) {
                 onClick={() => { sfx("hit"); setProfile({ ...profile, character: c.id }); }}
               >
                 {selected && <span className="char-badge">PILOT</span>}
-                <ComicArt id={c.id} size={92} />
+                <PixelSprite id={c.id} size={92} />
                 <span className="char-name">{c.name}</span>
                 <span className="char-tag">{c.tag}</span>
               </button>
@@ -693,7 +700,7 @@ function PlayerPage({ xp, profile, setProfile, stats, doneSections }) {
             <div className="lbl">Battles won today</div>
           </div>
           <div className="record-tile">
-            <div className="num">{acc === null ? "—" : `${acc}%`}</div>
+            <div className="num">{acc === null ? "n/a" : `${acc}%`}</div>
             <div className="lbl">Accuracy</div>
           </div>
         </div>
@@ -717,7 +724,7 @@ function PlayerPage({ xp, profile, setProfile, stats, doneSections }) {
       <div className="hero-card" style={{ marginTop: 16 }}>
         <h2>Your data</h2>
         <p className="sub" style={{ marginBottom: 10 }}>
-          Everything is saved only in this browser on this device — nothing is uploaded.
+          Everything is saved only in this browser on this device, nothing is uploaded.
           Resetting wipes XP, streak, missions, stats and purchases here.
         </p>
         <button

@@ -131,7 +131,7 @@ function DodgeField({ zones, duration = 950, character, onResolve }) {
 
   return (
     <div className="dodge-field">
-      <div className="dodge-label">INCOMING — MOVE! <span className="dodge-keys">A / D or ← / →</span></div>
+      <div className="dodge-label">INCOMING, MOVE! <span className="dodge-keys">A / D or ← / →</span></div>
       <div className="dodge-lane">
         {zones.map((z, i) => (
           <div key={i} className="dodge-zone" style={{ left: `${z.from}%`, width: `${z.to - z.from}%` }} />
@@ -258,7 +258,7 @@ function Battle({ section, speed, revenge, reward = 15, extraHeart, warp, charac
         <p style={{ margin: "8px 0 16px" }}>The enemy survives. Redo the lesson to try again.</p>
         {q && q.explanation && (
           <div className="explain">
-            <div className="explain-title">The one that beat you — {answerText(q)}</div>
+            <div className="explain-title">The one that beat you, {answerText(q)}</div>
             <p>{q.explanation}</p>
           </div>
         )}
@@ -293,7 +293,7 @@ function Battle({ section, speed, revenge, reward = 15, extraHeart, warp, charac
       )}
       {enraged && (
         <>
-          <div className="phase-banner" aria-hidden="true">PHASE 2 — THE NINJA ENRAGES!</div>
+          <div className="phase-banner" aria-hidden="true">PHASE 2, THE NINJA ENRAGES!</div>
           <div className="phase-flash" aria-hidden="true" />
         </>
       )}
@@ -392,7 +392,7 @@ function Battle({ section, speed, revenge, reward = 15, extraHeart, warp, charac
         <div className="row">
           <input
             type="text"
-            placeholder="Type your answer…"
+            placeholder="Type your answer"
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
             onKeyDown={(e) => {
@@ -430,7 +430,7 @@ function Battle({ section, speed, revenge, reward = 15, extraHeart, warp, charac
       {hit && <div className="feedback good">Direct hit!</div>}
       {reveal && (
         <>
-          <div className="feedback bad">Correct answer: {answerText(q)} — this one will come back!
+          <div className="feedback bad">Correct answer: {answerText(q)}, this one will come back!
           </div>
           {q.explanation && (
             <div className="explain">

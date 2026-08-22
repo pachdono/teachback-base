@@ -86,8 +86,8 @@ Use ${totalSections} sections in total, distributed across the ${days} day(s) (r
 Each section has ${qPer} questions. Keep every question under 20 words.
 Question types: "multiple_choice" (4 options, "answer" = correct index) or "fill_blank" ("answer" = the word/phrase).
 For "fill_blank", also include "accept": an array of 0-3 alternative correct answers (different spellings, numeric vs word form, common synonyms).
-Every question MUST include an "explanation" (1-2 sentences) that says WHY the answer is correct. For math, calculations, or any step-based problem, show the method/working used to reach the answer — not just the final result. Use "\\n" between steps when it helps readability.
-Every question MUST also include a "hint" — a short nudge (under 15 words) that points toward the method WITHOUT revealing the answer.
+Every question MUST include an "explanation" (1-2 sentences) that says WHY the answer is correct. For math, calculations, or any step-based problem, show the method/working used to reach the answer, not just the final result. Use "\\n" between steps when it helps readability.
+Every question MUST also include a "hint", a short nudge (under 15 words) that points toward the method WITHOUT revealing the answer.
 Also include a short top-level "title" (under 6 words) naming the overall subject.
 Keep all text concise. Return JSON exactly like:
 {"title":"...","days":[{"day":1,"title":"...","sections":[{"title":"...","questions":[{"type":"multiple_choice","question":"...","options":["a","b","c","d"],"answer":0,"explanation":"...","hint":"..."},{"type":"fill_blank","question":"...","answer":"...","explanation":"...","hint":"..."}]}]}]}
@@ -113,7 +113,7 @@ app.post("/api/exam", async (req, res) => {
         role: "user",
         content: `Create a mock exam with exactly ${n} questions on this topic: ${topic}
 Mix "multiple_choice" (4 options, "answer" = correct index) and "fill_blank" ("answer" = the word/phrase). For "fill_blank", also include "accept": an array of 0-3 alternative correct answers (different spellings, numeric vs word form, common synonyms). Cover the topic broadly with difficulty increasing from easy to hard. Keep each question under 25 words.
-Every question MUST include an "explanation" (1-2 sentences) that shows the method/working used to reach the answer — not just the final result.
+Every question MUST include an "explanation" (1-2 sentences) that shows the method/working used to reach the answer, not just the final result.
 Also include a short "title" (under 6 words) for the exam.
 Return JSON exactly like:
 {"title":"...","questions":[{"type":"multiple_choice","question":"...","options":["a","b","c","d"],"answer":0,"explanation":"..."},{"type":"fill_blank","question":"...","answer":"...","explanation":"..."}]}`
@@ -192,6 +192,68 @@ Return JSON exactly like:
 Material: ${text}`
       }]
     }).finalMessage();
+    res.json(safeParse(pickText(msg)));
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+
+// Classroom mode. Two calls: one to make the class, one to mark each answer.
+app.post("/api/classroom", async (req, res) => {
+  try {
+    const { topic, material } = req.body;
+    const text = String(material || "").slice(0, MAX_NOTES);
+    if (!text.trim() && !topic) throw userError("Nothing to build a class from.");
+    const msg = await client.messages.stream({
+      model: "claude-sonnet-4-6",
+      max_tokens: 4000,
+      system: "You write questions that real students ask. Respond ONLY with valid JSON. No markdown fences.",
+      messages: [{
+        role: "user",
+        content: `The user is about to teach a class on this material${topic ? ` (topic: ${topic})` : ""}.
+Invent 4 students and give each one question they would actually ask.
+Make the questions get harder: the first is a simple "what does that mean", the last should probe a
+misconception or ask why something is true rather than what it is.
+Questions must be answerable from the material. Keep each under 25 words and sound like a real kid talking.
+Give each student a first name and a one word mood from: curious, shy, cheeky, sharp.
+Return JSON exactly like:
+{"students":[{"name":"...","mood":"curious","question":"..."}]}
+
+Material: ${text}`
+      }]
+    }).finalMessage();
+    res.json(safeParse(pickText(msg)));
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+app.post("/api/classanswer", async (req, res) => {
+  try {
+    const { question, explanation, material } = req.body;
+    if (!String(explanation || "").trim()) throw userError("Write an explanation first.");
+    const msg = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1200,
+      system: "You are marking whether a student teacher explained something clearly. Respond ONLY with valid JSON.",
+      messages: [{
+        role: "user",
+        content: `A student asked: ${question}
+The teacher answered: ${explanation}
+
+Judge only whether a curious beginner would now understand. Reward plain language and a concrete example.
+Do not reward jargon, and do not punish informality.
+"understood" is true when the answer is correct and clear enough to satisfy the student.
+"reaction" is the student replying in one sentence, in their own voice, either getting it or saying
+exactly what still confuses them.
+"missing" is at most two things the answer left out, empty if none.
+Return JSON exactly like:
+{"score":80,"understood":true,"reaction":"...","missing":["..."]}
+
+Reference material: ${String(material || "").slice(0, 4000)}`
+      }]
+    });
     res.json(safeParse(pickText(msg)));
   } catch (err) {
     fail(res, err);

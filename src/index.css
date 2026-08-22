@@ -43,6 +43,7 @@
 
 body {
   background: var(--bg);
+  background-color: var(--bg);
   background-image:
     radial-gradient(ellipse 60% 40% at 70% -10%, color-mix(in srgb, var(--purple) 18%, transparent), transparent),
     radial-gradient(ellipse 40% 30% at 10% 110%, color-mix(in srgb, var(--purple) 10%, transparent), transparent),
@@ -154,18 +155,18 @@ h1, h2, h3 { font-family: 'Baloo 2', 'Segoe UI', system-ui, sans-serif; letter-s
 .stars-layer {
   position: absolute; inset: 0;
   background-image:
-    radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,.9), transparent 60%),
-    radial-gradient(1.5px 1.5px at 44% 60%, rgba(255,255,255,.75), transparent 60%),
-    radial-gradient(1px 1px at 71% 33%, rgba(255,255,255,.8), transparent 60%),
-    radial-gradient(2px 2px at 88% 79%, rgba(255,255,255,.6), transparent 60%),
-    radial-gradient(1px 1px at 27% 87%, rgba(255,255,255,.7), transparent 60%);
+    radial-gradient(1px 1px at 12% 18%, var(--star, #fff), transparent 60%),
+    radial-gradient(1.5px 1.5px at 44% 60%, color-mix(in srgb, var(--star, #fff) 75%, transparent), transparent 60%),
+    radial-gradient(1px 1px at 71% 33%, color-mix(in srgb, var(--star, #fff) 80%, transparent), transparent 60%),
+    radial-gradient(2px 2px at 88% 79%, color-mix(in srgb, var(--star, #fff) 60%, transparent), transparent 60%),
+    radial-gradient(1px 1px at 27% 87%, color-mix(in srgb, var(--star, #fff) 70%, transparent), transparent 60%);
   background-size: 600px 600px;
 }
 /* Fewer, larger stars with a soft halo around them. */
 .stars-layer.near {
   background-image:
-    radial-gradient(3px 3px at 33% 25%, #fff 0%, rgba(255,255,255,.35) 40%, transparent 70%),
-    radial-gradient(2px 2px at 78% 62%, #fff 0%, rgba(255,255,255,.35) 40%, transparent 70%);
+    radial-gradient(3px 3px at 33% 25%, var(--star, #fff) 0%, rgba(255,255,255,.35) 40%, transparent 70%),
+    radial-gradient(2px 2px at 78% 62%, var(--star, #fff) 0%, rgba(255,255,255,.35) 40%, transparent 70%);
   background-size: 520px 520px;
   opacity: .9;
 }
@@ -307,14 +308,14 @@ h1, h2, h3 { font-family: 'Baloo 2', 'Segoe UI', system-ui, sans-serif; letter-s
 .hero-card h1 { font-size: 30px; line-height: 1.15; margin-bottom: 8px; }
 .hero-card .sub { color: var(--muted); margin-bottom: 18px; font-size: 15px; line-height: 1.55; }
 
-textarea, input[type="text"] {
+textarea, input[type="text"], input[type="email"], input[type="password"] {
   width: 100%; padding: 14px 16px; font: 500 15px 'Inter', sans-serif;
   border: 1px solid var(--line); border-radius: 14px;
   background: rgba(0,0,0,.25); color: var(--text);
   resize: vertical; outline: none; transition: border .15s, box-shadow .15s;
 }
 textarea::placeholder, input::placeholder { color: #6f6a8f; }
-textarea:focus, input[type="text"]:focus { border-color: var(--purple); box-shadow: 0 0 0 3px color-mix(in srgb, var(--purple) 18%, transparent); }
+textarea:focus, input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus { border-color: var(--purple); box-shadow: 0 0 0 3px color-mix(in srgb, var(--purple) 18%, transparent); }
 
 .row { display: flex; gap: 12px; margin-top: 14px; align-items: center; flex-wrap: wrap; }
 select {
@@ -408,7 +409,16 @@ select {
 .node-card h3 { font-size: 17px; }
 .node-card .meta { color: var(--muted); font-size: 13px; margin-top: 3px; font-weight: 500; }
 
-.boss-row { display: flex; justify-content: center; margin-top: 30px; }
+/* One per row on narrow screens, side by side with real space between when
+   there is room. gap keeps them apart instead of letting them touch. */
+.boss-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 22px;
+  margin-top: 42px;
+  margin-bottom: 8px;
+}
+.boss-row .boss-card { width: 100%; }
 .boss-card {
   position: relative;
   background: linear-gradient(160deg, color-mix(in srgb, var(--purple) 15%, transparent), rgba(10,11,30,.6));
@@ -1584,8 +1594,13 @@ img.enemy, img.boss-skull {
 }
 
 /* ---- Record a lecture ---- */
-.rec-dot { width: 10px; height: 10px; border-radius: 50%; background: #e5484d; animation: rec-pulse 1.1s ease-in-out infinite; }
-@keyframes rec-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+.rec-btn { display: inline-flex; align-items: center; gap: 7px; }
+.rec-glyph { font-size: 10px; line-height: 1; color: #e5484d; }
+.rec-glyph.stop, .rec-glyph.play { color: inherit; font-size: 11px; }
+.rec-btn.live .rec-glyph { color: inherit; }
+.rec-btn:not(.live) .rec-glyph { animation: rec-pulse 1.2s ease-in-out infinite; }
+@keyframes rec-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+.rec-status { color: #e5484d; }
 .rec-heard {
   margin-top: 10px; padding: 10px 12px; max-height: 120px; overflow-y: auto;
   border-radius: var(--radius); border: 1px solid var(--line);
@@ -1597,13 +1612,103 @@ img.enemy, img.boss-skull {
 .voice-row label { display: flex; flex-direction: column; gap: 4px; }
 .script { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
 .script-line {
+  display: block; width: 100%; text-align: left; cursor: pointer;
   padding: 10px 12px; border-radius: var(--radius); line-height: 1.6;
   border: 1px solid transparent; background: rgba(255,255,255,.03);
+  color: var(--text); font: inherit;
   transition: background var(--dur) var(--ease), border var(--dur) var(--ease);
 }
+.script-line:hover { background: rgba(255,255,255,.07); border-color: var(--line); }
 .script-line .who {
   display: block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
   color: var(--muted); margin-bottom: 4px;
 }
 .script-line.guest { background: rgba(255,255,255,.015); }
 .script-line.now { border-color: var(--purple2); background: color-mix(in srgb, var(--purple) 14%, transparent); }
+
+/* ---- Leaderboard ---- */
+.board { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.board-row {
+  display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: var(--radius);
+  border: 1px solid var(--line); background: rgba(255,255,255,.03);
+}
+.board-row.top { border-color: color-mix(in srgb, var(--gold) 45%, transparent); }
+.board-rank { color: var(--muted); font-size: 13px; }
+.board-row.top .board-rank { color: var(--gold); }
+.board-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board-xp { color: var(--purple2); font-size: 13px; }
+
+/* ---- Recording review ---- */
+.rec-review {
+  flex-basis: 100%; margin-top: 10px; padding: 12px;
+  border-radius: var(--radius); border: 1px solid var(--line);
+  background: rgba(0,0,0,.25);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.rec-audio { width: 100%; height: 34px; }
+.rec-edit {
+  width: 100%; min-height: 90px; resize: vertical;
+  font-size: 13px; line-height: 1.6;
+}
+
+/* ---- Account form ---- */
+.auth-form { display: flex; flex-direction: column; gap: 14px; max-width: 380px; margin-top: 18px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field > span {
+  font-size: 12px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted); font-weight: 600;
+}
+.auth-go { width: 100%; margin-top: 4px; }
+.auth-swap {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; font-size: 13px; color: var(--purple2);
+  text-align: center; text-decoration: underline;
+  text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--purple2) 40%, transparent);
+}
+.auth-swap:hover { color: var(--text); }
+
+/* ---- Classroom ---- */
+.class-card .class-card-kids { display: flex; gap: 6px; justify-content: center; align-items: flex-end; }
+.classroom { display: flex; flex-direction: column; gap: 14px; }
+.class-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.class-progress { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.class-dots { display: flex; gap: 6px; }
+.class-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.class-dot.done { background: var(--purple2); }
+.class-dot.now { background: var(--gold); }
+
+.class-row { display: flex; gap: 14px; align-items: flex-start; }
+.class-kid { text-align: center; flex-shrink: 0; width: 88px; }
+.class-name { font-weight: 700; font-size: 13px; margin-top: 4px; }
+.class-mood { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.class-bubble {
+  position: relative; flex: 1; padding: 14px 16px;
+  border-radius: var(--radius-lg); border: 1px solid var(--line);
+  background: rgba(255,255,255,.04);
+}
+.class-bubble p { margin: 0; line-height: 1.6; }
+.class-again { margin-top: 8px !important; font-size: 13px; color: var(--gold); }
+
+.class-reply {
+  padding: 14px 16px; border-radius: var(--radius-lg);
+  border: 1px solid var(--line); background: rgba(255,255,255,.03);
+  display: flex; flex-direction: column; gap: 10px; align-items: flex-start;
+}
+.class-reply.ok { border-color: color-mix(in srgb, var(--green, #3ddc97) 45%, transparent); }
+.class-reply.no { border-color: color-mix(in srgb, #e5484d 45%, transparent); }
+.class-score { font-size: 22px; font-weight: 800; }
+.class-reply.ok .class-score { color: var(--green, #3ddc97); }
+.class-reply.no .class-score { color: #e5484d; }
+.class-said { margin: 0; line-height: 1.6; }
+.class-missing { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+
+.class-report { list-style: none; padding: 0; margin: 16px 0 0; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.class-report li {
+  padding: 10px 12px; border-radius: var(--radius);
+  border: 1px solid var(--line); background: rgba(255,255,255,.03);
+  font-size: 14px; line-height: 1.6;
+}
+.class-report li.ok { border-color: color-mix(in srgb, var(--green, #3ddc97) 40%, transparent); }
+.class-report li.no { border-color: color-mix(in srgb, #e5484d 40%, transparent); }
+.class-report .who { display: block; font-weight: 700; font-size: 12px; color: var(--muted); margin-bottom: 2px; }
