@@ -1,65 +1,75 @@
-# TeachBack — Product Description
+# TeachBack, product description
 
-Team: pachdono and Casper. Track: Education (Iteration).
+Team: Dono and Casper. Track: Education (Iteration).
 
-## Core concept
+## The idea
 
-Studying is passive. You re-read your notes, it feels like it's working, and you
-don't find out what you actually misunderstood until the exam.
+Studying is passive. You re-read your notes, it feels like it is working, and you
+do not find out what you misunderstood until the exam.
 
-TeachBack takes your own notes and turns them into a study campaign. An AI reads
-what you paste and builds topics and questions out of it. Anything you get wrong
-gets saved so you can go back and beat it. And the last step isn't another
-multiple choice test — you have to write out an explanation of the whole topic,
-and an AI grades how well you actually understand it.
+TeachBack takes your own notes and turns them into a study game. An AI reads what
+you paste and builds the topics and questions out of it. Anything you get wrong
+comes back until you beat it. The last level is not another multiple choice test.
+You write out an explanation of the topic, and an AI marks how well you taught it.
 
-That last part is the point. Picking the right option out of four proves you
-recognise an answer. Explaining something proves you understand it.
+That is the point. Picking the right option out of four proves you recognise an
+answer. Explaining something proves you understand it.
 
-## Functional modules
+## What is in it
 
-**Campaign generator.** You paste notes, the AI returns a structured plan of
-topics and questions in JSON, and the app renders it as the campaign. None of the
-content is written by us — it all comes from the student's own material.
+**Mission builder.** You paste notes, upload a PDF, or record a lecture and let
+the browser transcribe it. The AI returns a structured plan in JSON and the app
+renders it as the game. None of the content is written by us. It all comes from
+the student's own material.
 
-**Quiz engine.** Multiple choice and fill in the blank. Typed answers are matched
-loosely, so writing `x = 4` instead of `4` still counts. Getting one wrong shows
-you the reasoning, not just the correct option.
+**Battles.** Multiple choice and fill in the blank, fought as an HP battle
+against a pixel monster. The number of questions left is the monster's health, so
+you cannot finish a topic by getting things wrong. A wrong answer sends the
+question to the back of the queue and shows you the working.
 
-**Revenge Round** (prototype). Every question you miss goes into a pool you can
-attack again later. Get it right and it comes off the list. It's spaced
-repetition, except you can see it.
+**Revenge Round.** Every answer is counted per question. Anything you have missed
+more than you have hit becomes a weak spot, and those come back as a ninja. Miss
+five in one mission and he blocks the path to the boss.
 
-**Final Boss — Teach It Back** (prototype). You write an explanation of
-everything you learned. The AI gives it a score out of 100, lists what you got
-right, and names what you left out.
+**The teach back boss.** You explain the whole topic in your own words. The AI
+scores it out of 100, lists what you got right, and names what you left out. That
+score becomes your damage multiplier for the fight, so teaching it well makes you
+stronger.
 
-## Development background
+**Classroom.** Four AI students each ask their own question about your material,
+getting harder as you go. You answer in plain language until each one says they
+understand. The marking rewards clear explanation and does not reward jargon, so
+a more technical answer can score lower.
 
-We're two students who kept running into the same problem: there's no easy way to
+**Listen.** Any topic becomes a short two host audio episode, written to be heard
+rather than read, and spoken by the browser in a voice you choose.
+
+**Progress and accounts.** XP from every win, four armour tiers, streaks, daily
+quests, a shop, and five themes that repaint the whole game. Sign in and your
+progress syncs to any device, with a global leaderboard.
+
+## Why we built it
+
+We are two students who kept hitting the same problem. There is no easy way to
 tell the difference between having read something and actually knowing it.
 
-The tools we tried didn't fix it. Quizlet checks whether you recognise an answer.
-Anki is good at recall but you have to write every card yourself. Neither one
+The tools we tried did not fix it. Quizlet checks whether you recognise an
+answer. Anki is good at recall but you write every card yourself. Neither one
 tells you whether you could explain the topic to someone else, which is the thing
 exams actually test.
 
 We also wanted it to not feel like homework, because study apps are easy to quit.
-That's why it's built as a game.
+That is why it is a game.
 
-## Current progress
+## Where it is now
 
-The whole loop works: paste notes, get a campaign, do the quizzes, miss questions
-and see them collected, then face the boss and get graded on your explanation.
-It runs against a live API, with React on the front and Express on the back so
-the API key stays off the browser.
+The whole loop works end to end. Paste notes, get a mission, fight through it,
+face the ninja for what you keep missing, beat the boss by teaching it, then
+teach a classroom of students who ask their own questions.
 
-What we have is a working skeleton. The generator and the quizzes are in good
-shape. The two features that make it different — the Revenge Round and the
-teach-back boss — work, but they're plain screens. They prove the idea without
-delivering the experience yet.
+React on the front, Express on the back so the API key stays off the browser, and
+Postgres behind Supabase for accounts with row level security.
 
-Next up: turn the Revenge Round into a recurring enemy that gets stronger the
-longer you avoid it, turn the boss into a real fight where your teach-back score
-powers your attacks, then add XP and streaks, and finally accounts with a shared
-leaderboard.
+Next: a library where students publish the missions they made so others can play
+them, teacher dashboards with a class join code, a mobile app, and review
+scheduling that tells each student what to go over today.
