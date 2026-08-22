@@ -1,3 +1,5 @@
+export const PLANETS = ["ringworld", "world", "moon", "comet", "voidrock", "starlet"];
+
 export const MONSTERS = ["slime", "eyeball", "bat", "spore"];
 
 export const CHAR_ATK = { spaceboy: "blaster", bob: "raygun", robert: "laser", max: "slash", einstein: "orb" };
@@ -189,6 +191,96 @@ export const PIXEL_SPRITES = {
       "..sspppss..",
       "..sssssss..",
       "..ss...ss..",
+    ],
+  },
+  ringworld: {
+    colors: { r: "#a78bfa", R: "#7c5cff", b: "#ffc24b", B: "#d98f1f", h: "#ffe9a8" },
+    map: [
+      "....bbbbb....",
+      "..bbhbbbbbb..",
+      ".bbhhbbbbbBb.",
+      ".bbbbbbbbbBB.",
+      "rrrrrrrrrrrrr",
+      "RRRRRRRRRRRRR",
+      ".bbbbbbbbBBB.",
+      "..bbbbbbBBB..",
+      "....bbbbb....",
+    ],
+  },
+  moon: {
+    colors: { g: "#d7d3e8", G: "#a8a3c4", k: "#7a7590", h: "#f2f0fa" },
+    map: [
+      "...ggggg...",
+      ".gghggggGg.",
+      ".ghhgggGGg.",
+      "ggggkggggGg",
+      "gggkkggggGG",
+      "ggggkggGgGG",
+      "gggggggkkGG",
+      "ggGgggkkkGG",
+      ".gGGgggkgG.",
+      ".gGGGggGGg.",
+      "...GGGGG...",
+    ],
+  },
+  world: {
+    colors: { b: "#4cc9f0", B: "#2a7fb8", g: "#3ddc97", G: "#2a9d6f" },
+    map: [
+      "...bbbbb...",
+      ".bbggbbbbb.",
+      ".bgggbggBB.",
+      "bbggbbgggBB",
+      "bbbbbbgGGBB",
+      "bggbbbbgGBB",
+      "bggGbbbbbBB",
+      "bbGGbbggBBB",
+      ".bbbbbGGgB.",
+      ".bbbbbbGBB.",
+      "...bBBBB...",
+    ],
+  },
+  comet: {
+    colors: { w: "#ffffff", c: "#a8e8ff", t: "#7c5cff", T: "#a78bfa" },
+    map: [
+      "........ccc..",
+      "...tt..cwwwc.",
+      ".ttTTTcwwwwwc",
+      "tTTTTTccwwwcc",
+      ".ttTTTcwwwwwc",
+      "...tt..cwwwc.",
+      "........ccc..",
+    ],
+  },
+  voidrock: {
+    colors: { k: "#2a1a4a", K: "#1a0f33", p: "#5a3fb0", P: "#7c5cff" },
+    map: [
+      "...ppppp...",
+      ".ppkkkppKK.",
+      ".pkkkkkkKK.",
+      "pkkkPkkkkKK",
+      "pkkkkkkkPKK",
+      "pkPkkkkkkKK",
+      "pkkkkkPkkKK",
+      "pkkkkkkkkKK",
+      ".pkkkkkkKK.",
+      ".pkkkkkKKK.",
+      "...KKKKK...",
+    ],
+  },
+  starlet: {
+    colors: { y: "#ffc24b", w: "#fff3c4", o: "#ff9f1c" },
+    map: [
+      ".....w.....",
+      ".....y.....",
+      "....ywy....",
+      "....ywy....",
+      "..oywwwyo..",
+      "wyywwwwwyyw",
+      "..oywwwyo..",
+      "....ywy....",
+      "....ywy....",
+      ".....y.....",
+      ".....o.....",
     ],
   },
   einstein: {

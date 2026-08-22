@@ -115,6 +115,7 @@ export function sfx(name) {
     if (name === "win") { play(523, 0, 0.12); play(659, 0.12, 0.12); play(784, 0.24, 0.12); play(1047, 0.36, 0.3); }
     if (name === "lose") { play(392, 0, 0.2); play(330, 0.2, 0.2); play(262, 0.4, 0.35, "triangle"); }
     if (name === "tick") { play(880, 0, 0.05, "sine", 0.06); }
+    if (name === "fly") { play(320, 0, 0.16, "sine", 0.07); play(500, 0.08, 0.2, "sine", 0.06); play(720, 0.18, 0.22, "sine", 0.05); }
   } catch {}
 }
 

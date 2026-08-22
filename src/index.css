@@ -436,7 +436,61 @@ select {
 }
 .node-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--purple) 50%, transparent); box-shadow: var(--glow); }
 .node-card.done { border-color: rgba(61,220,151,.4); background: rgba(61,220,151,.06); }
-.planet { font-size: 42px; flex-shrink: 0; animation: floaty 4s ease-in-out infinite; }
+.planet { flex-shrink: 0; width: 46px; height: 46px; display: grid; place-items: center; }
+.planet-art {
+  position: relative;
+  animation: floaty 4s ease-in-out infinite;
+  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--purple) 35%, transparent));
+}
+/* Each planet drifts on its own beat, or the whole column bobs in lockstep. */
+.node:nth-child(2n) .planet-art { animation-duration: 5.2s; animation-delay: -1.4s; }
+.node:nth-child(3n) .planet-art { animation-duration: 4.6s; animation-delay: -2.6s; }
+
+.planet-tick {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  font: 800 26px 'Baloo 2', sans-serif; color: var(--green);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  border-radius: 50%;
+}
+.node-card.done .planet-art { filter: grayscale(.7) brightness(.8); animation: none; }
+/* The sprite bobs on its own by default. Here the wrapper does it, so turning
+   the inner one off keeps it from bobbing twice as far. */
+.planet-art .pixel-sprite, .flyer .pixel-sprite { animation: none; }
+.node-card.here { border-color: color-mix(in srgb, var(--purple) 55%, transparent); }
+
+/* ---- The character flying between planets ---- */
+.map { position: relative; }
+.flyer {
+  position: absolute; top: 0; left: 0; z-index: 4;
+  pointer-events: none;
+  transition: transform .65s cubic-bezier(.45, 0, .25, 1);
+}
+/* Facing lives on its own element. The tilt below animates transform, and an
+   animation beats an inline style, so the two cannot share one element. */
+.flyer-face { transition: transform .2s; }
+.flyer-body { position: relative; animation: floaty 2.6s ease-in-out infinite; }
+.flyer.moving .flyer-body { animation: flyer-tilt .65s ease-in-out; }
+
+/* The exhaust only exists while travelling. */
+.flyer-trail {
+  position: absolute; top: 55%; right: 100%; width: 0; height: 6px;
+  border-radius: 999px; opacity: 0;
+  background: linear-gradient(to left, var(--gold), color-mix(in srgb, var(--red) 60%, transparent), transparent);
+}
+.flyer.moving .flyer-trail { animation: flyer-burn .65s ease-out; }
+
+@keyframes flyer-tilt {
+  0% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(-14deg) scale(1.12); }
+  75% { transform: rotate(-8deg) scale(1.08); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+@keyframes flyer-burn {
+  0% { width: 0; opacity: 0; }
+  35% { width: 46px; opacity: 1; }
+  100% { width: 0; opacity: 0; }
+}
 .node-card h3 { font-size: 17px; }
 .node-card .meta { color: var(--muted); font-size: 13px; margin-top: 3px; font-weight: 500; }
 
@@ -1573,7 +1627,8 @@ img.enemy, img.boss-skull {
 @media (prefers-reduced-motion: reduce) {
   .shooting-star, .rocket-fly, .astro-drift, .pixel, .enemy, .boss-skull,
   .aurora, .planet, .avatar-big, .stars-layer, .rkt-flame, .astro-screen,
-  .planet-hold, .flame-big, .nav-dot, .pixel-sprite, .p-attack, .p-hurt,
+  .planet-hold, .flame-big, .nav-dot, .pixel-sprite, .p-attack, .p-hurt, .planet-art,
+  .flyer, .flyer-face, .flyer-body, .flyer-trail,
   .e-lunge, .e-flash, .battle.rumble, .fx-bolt, .fx-burst, .fx-muzzle,
   .fx-bubble, .fx-beam, .fx-slash, .fx-orb, .fx-shuriken, .shadow-dash,
   .alarm, .atk-callout, .cut-sprite, .cut-name, .fight-flash, .cutscene::after,

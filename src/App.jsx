@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { API } from "./config";
 import { Icon, SpaceDecor } from "./ui";
-import { PixelSprite } from "./sprites";
+import { PixelSprite, PLANETS } from "./sprites";
 import { sfx, setMasterVolume, loadSave, SAVE, localDate, shuffle, shuffleOptions, QUEST_GOAL, QUEST_XP } from "./game";
 import Battle from "./Battle";
 import BossBattle, { CutScene } from "./BossBattle";
@@ -16,8 +16,6 @@ import { THEMES, PERKS, RANKS, FAQS, Flashcards, Matching, StatsPage, StudySheet
 function newId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
-
-const PLANETS = ["🪐", "🌕", "🌍", "☄️", "🌑", "🌟"];
 
 export default function App() {
   const [page, setPage] = useState("home");
@@ -131,6 +129,101 @@ export default function App() {
       return;
     }
     setBattle({ dayIdx: di, secIdx: si, mode: null });
+  }
+
+  // ---- Flying between planets ----
+  // Your character stands on the map. Tapping a planet sends it there first,
+  // and the battle only opens once it lands.
+  const mapRef = useRef(null);
+  const [standing, setStanding] = useState(null); // "dayIndex-sectionIndex"
+  const [spot, setSpot] = useState(null);         // where the sprite sits, in pixels
+  const [flying, setFlying] = useState(false);
+  const [facing, setFacing] = useState(1);        // 1 right, -1 left
+
+  // The pixel position of one planet, measured from the top left of the map.
+  // offsetLeft and offsetTop are where the browser laid the element out, added
+  // up on the way to the map. getBoundingClientRect would be easier, but it
+  // reports the painted box, and the cards tilt under the pointer, so a hover
+  // anywhere on the map would shift the reading.
+  function planetSpot(id) {
+    const map = mapRef.current;
+    const el = map?.querySelector(`[data-node="${id}"] .planet`);
+    if (!el) return null;
+    let x = el.offsetWidth / 2;
+    let y = el.offsetHeight / 2;
+    for (let n = el; n && n !== map; n = n.offsetParent) {
+      x += n.offsetLeft;
+      y += n.offsetTop;
+    }
+    // Up and to the left of the middle. The cards are barely taller than a
+    // planet, so standing right on top would reach into the card above.
+    return { x: x - 24, y: y - 12 };
+  }
+
+  // Park the sprite on the first planet you have not cleared. useLayoutEffect
+  // instead of useEffect so it is placed before the browser paints, or it
+  // would flash in the corner for a frame.
+  useLayoutEffect(() => {
+    if (!plan || battle) return;
+    let target = standing;
+    if (!target || !planetSpot(target)) {
+      target = null;
+      for (let di = 0; di < plan.days.length && !target; di++) {
+        for (let si = 0; si < plan.days[di].sections.length && !target; si++) {
+          if (!doneSections.includes(`${di}-${si}`)) target = `${di}-${si}`;
+        }
+      }
+      target = target || "0-0";
+    }
+    const at = planetSpot(target);
+    if (at) {
+      setStanding(target);
+      setSpot(at);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId, plan, battle, doneSections]);
+
+  // The first reading is taken before the web fonts land, and the cards shift
+  // when they do. So re-measure whenever the map's box changes, rather than
+  // trusting one reading. Snapping to where we are already flying is harmless.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !standing) return;
+    const snap = () => {
+      const at = planetSpot(standing);
+      if (at) setSpot(at);
+    };
+    const ro = new ResizeObserver(snap);
+    ro.observe(map);
+    window.addEventListener("resize", snap);
+    document.fonts?.ready.then(snap);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", snap);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [standing, plan]);
+
+  const FLIGHT_MS = 650;
+
+  function flyTo(di, si) {
+    const id = `${di}-${si}`;
+    const to = planetSpot(id);
+    // Already there, or the map has not measured yet: just go.
+    if (!to || !spot || id === standing) {
+      setStanding(id);
+      startStoryBattle(di, si);
+      return;
+    }
+    sfx("fly");
+    setFacing(to.x >= spot.x ? 1 : -1);
+    setFlying(true);
+    setSpot(to);
+    setStanding(id);
+    setTimeout(() => {
+      setFlying(false);
+      startStoryBattle(di, si);
+    }, FLIGHT_MS);
   }
 
   function startBoss() {
@@ -745,27 +838,63 @@ export default function App() {
               <div className="ninja-warn hot">The Ninja blocks your path. Your next battle is an AMBUSH! Defeat him to reach the boss.
               </div>
             )}
-            {plan.days.map((d, di) => (
-              <div key={di}>
-                <div className="day-label">DAY {d.day} · {d.title}</div>
-                {d.sections.map((s, si) => {
-                  const id = `${di}-${si}`;
-                  const done = doneSections.includes(id);
-                  const planet = PLANETS[(di * 2 + si) % PLANETS.length];
-                  return (
-                    <div className="node" key={si}>
-                      <button type="button" className={`node-card ${done ? "done" : ""}`} onClick={() => startStoryBattle(di, si)}>
-                        <div className="planet" aria-hidden="true">{done ? "✓" : planet}</div>
-                        <div>
-                          <h3>{s.title}</h3>
-                          <div className="meta">{s.questions.length} enemies · tap to battle</div>
-                        </div>
-                      </button>
+            <div className="map" ref={mapRef}>
+              {plan.days.map((d, di) => (
+                <div key={di}>
+                  <div className="day-label">DAY {d.day} · {d.title}</div>
+                  {d.sections.map((s, si) => {
+                    const id = `${di}-${si}`;
+                    const done = doneSections.includes(id);
+                    // Count every section before this one so the planets keep
+                    // cycling across day boundaries instead of repeating.
+                    const nth = plan.days.slice(0, di).reduce((n, dd) => n + dd.sections.length, 0) + si;
+                    const planet = PLANETS[nth % PLANETS.length];
+                    return (
+                      <div className="node" key={si}>
+                        <button
+                          type="button"
+                          data-node={id}
+                          className={`node-card ${done ? "done" : ""} ${id === standing ? "here" : ""}`}
+                          onClick={() => flyTo(di, si)}
+                        >
+                          {/* The outer box never moves, so it is safe to
+                              measure. Only the art inside it bobs. */}
+                          <div className="planet" aria-hidden="true">
+                            <div className="planet-art">
+                              <PixelSprite id={planet} size={46} />
+                              {done && <span className="planet-tick">✓</span>}
+                            </div>
+                          </div>
+                          <div>
+                            <h3>{s.title}</h3>
+                            <div className="meta">{s.questions.length} enemies · tap to battle</div>
+                          </div>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+
+              {/* Your character, sitting on top of the map. It is one element
+                  that slides between planets, so nothing else has to move. */}
+              {spot && (
+                <div
+                  className={`flyer ${flying ? "moving" : ""}`}
+                  // The second translate is in percent, so it shifts by the
+                  // sprite's own size, putting its middle on the point.
+                  style={{ transform: `translate(${spot.x}px, ${spot.y}px) translate(-50%, -50%)` }}
+                  aria-hidden="true"
+                >
+                  <div className="flyer-face" style={{ transform: `scaleX(${facing})` }}>
+                    <div className="flyer-body">
+                      <PixelSprite id={profile.character} size={32} />
+                      <span className="flyer-trail" />
                     </div>
-                  );
-                })}
-              </div>
-            ))}
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="boss-row">
               <button type="button" className="boss-card" onClick={startBoss}>
                 <div className="boss-card-pixel"><PixelSprite id="voidlord" size={78} /></div>
