@@ -5,18 +5,35 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const app = express();
 
+// Deployed, this runs behind a proxy. Without this, req.protocol is always
+// http and req.ip is the proxy, which would put every visitor in one bucket
+// in the rate limiter below.
+app.set("trust proxy", 1);
+
 // Only our own front end may call this. Without it, anyone who finds the URL
 // can spend our Anthropic credits.
 const ALLOWED = (process.env.ALLOWED_ORIGINS || "").split(",").filter(Boolean);
-app.use(cors({
-  origin(origin, cb) {
-    // no Origin header means curl or a health check, not a browser
-    if (!origin) return cb(null, true);
-    // any localhost port during development - vite picks whatever is free
-    if (/^https?:\/\/localhost:\d+$/.test(origin)) return cb(null, true);
-    if (ALLOWED.includes(origin)) return cb(null, true);
-    cb(new Error("blocked"));
-  },
+
+// A machine on your own network, for testing on a phone over wifi.
+const PRIVATE = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)[\d.]*(:\d+)?$/;
+
+export function originAllowed(origin, host) {
+  // No Origin header at all means curl or a health check, not a browser.
+  if (!origin) return true;
+  // Our own page. Deployed, the site and the API share one domain, so this is
+  // what every real request looks like and it needs no configuration.
+  try {
+    if (host && new URL(origin).host === host) return true;
+  } catch {
+    return false; // not a URL we can read, so not one we trust
+  }
+  if (PRIVATE.test(origin)) return true;
+  return ALLOWED.includes(origin);
+}
+
+app.use(cors((req, cb) => {
+  const ok = originAllowed(req.headers.origin, req.headers.host);
+  cb(ok ? null : new Error("blocked"), { origin: true });
 }));
 
 // Notes can be long, but not unlimited.

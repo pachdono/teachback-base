@@ -83,4 +83,6 @@ Every effect is generated in the browser with oscillators.
 
 `vercel.json` sends `/api/*` to the Express app, so the site and the API deploy
 together. Set `ANTHROPIC_API_KEY` in the host's environment variables, plus the
-two Supabase keys if you want accounts. Do not set `VITE_API_URL`.
+two Supabase keys if you want accounts. Do not set `VITE_API_URL`, and you do
+not need `ALLOWED_ORIGINS` either. The site and the API end up on one domain,
+and a page is always allowed to call its own API.
