@@ -147,12 +147,14 @@ function DodgeField({ zones, duration = 950, character, onResolve }) {
   );
 }
 
-function Battle({ section, speed, revenge, reward = 15, extraHeart, warp, character, xp, onHint, onStat, onWin, onExit }) {
+function Battle({ section, speed, revenge, reward = 15, extraHeart, warp, armour = 0, character, xp, onHint, onStat, onWin, onExit }) {
   // snapshot + shuffle at mount: question order and option order are randomized,
   // and the battle stays stable even if the source list changes mid-fight (revenge)
   const [questions] = useState(() => shuffle(section.questions.map(shuffleOptions)));
   const total = questions.length;
-  const maxLives = revenge ? (extraHeart ? 6 : 5) : (extraHeart ? 4 : 3);
+  // base hearts, plus one per armour tier, plus the Extra Heart perk
+  const base = revenge ? 5 : 3;
+  const maxLives = base + armour + (extraHeart ? 1 : 0);
   const [enraged, setEnraged] = useState(false);
   const timed = speed || (revenge && enraged);
   const T = speed ? (warp ? 20 : 15) : 12;

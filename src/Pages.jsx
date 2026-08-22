@@ -23,6 +23,15 @@ const PERKS = [
   { id: "warp", name: "Time Warp", desc: "Speed rounds give you 20 seconds per question.", icon: "◷", cost: 60 },
 ];
 
+// Armour is bought in order, each tier costing more and adding one heart.
+// Level 0 is what everyone starts with.
+const ARMOUR = [
+  { level: 0, name: "Flight Suit", desc: "Standard issue. No protection.", cost: 0, hearts: 0, tint: "#8f86c9" },
+  { level: 1, name: "Plated Vest", desc: "Scrap plating. One extra heart.", cost: 60, hearts: 1, tint: "#4cc9f0" },
+  { level: 2, name: "Void Alloy", desc: "Salvaged from the boss. Two extra hearts.", cost: 160, hearts: 2, tint: "#3ddc97" },
+  { level: 3, name: "Star Forged", desc: "Forged in a dying sun. Three extra hearts.", cost: 320, hearts: 3, tint: "#ffcf5c" },
+];
+
 const RANKS = ["Space Cadet", "Star Pilot", "Nova Knight", "Galaxy Commander", "Cosmic Captain", "Void Admiral", "Interstellar Legend"];
 
 const FAQS = [
@@ -564,6 +573,17 @@ function ShopPage({ xp, setXp, profile, setProfile }) {
     setProfile({ ...profile, owned: [...profile.owned, p.id] });
   }
 
+  // Armour goes up one step at a time, so you always buy the next tier.
+  const armourLevel = profile.armour ?? 0;
+  const nextArmour = ARMOUR[armourLevel + 1] ?? null;
+
+  function upgradeArmour() {
+    if (!nextArmour || xp < nextArmour.cost) return;
+    sfx("win");
+    setXp((x) => x - nextArmour.cost);
+    setProfile({ ...profile, armour: nextArmour.level });
+  }
+
   return (
     <>
       <div className="hero-card">
@@ -598,6 +618,37 @@ function ShopPage({ xp, setXp, profile, setProfile }) {
                     </button>
                   )}
                 </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="hero-card" style={{ marginTop: 16 }}>
+        <h2>Armour</h2>
+        <p className="sub">Each tier adds a heart to every battle. Buy them in order.</p>
+        <div className="armour-track">
+          {ARMOUR.map((a) => {
+            const owned = a.level <= armourLevel;
+            const isNext = nextArmour && a.level === nextArmour.level;
+            return (
+              <div key={a.level} className={`armour-tier ${owned ? "owned" : ""} ${isNext ? "next" : ""}`}>
+                <div className="armour-plate" style={{ "--plate": a.tint }} aria-hidden="true">
+                  {Array.from({ length: 3 }, (_, i) => (
+                    <span key={i} className={`plate-bar ${i < a.level ? "lit" : ""}`} />
+                  ))}
+                </div>
+                <h3>{a.name}</h3>
+                <p>{a.desc}</p>
+                {owned ? (
+                  <span className="owned-pill">{a.level === armourLevel ? "Equipped" : "Owned"}</span>
+                ) : isNext ? (
+                  <button className="btn sm tnum" disabled={xp < a.cost} onClick={upgradeArmour}>
+                    Upgrade · {a.cost} XP
+                  </button>
+                ) : (
+                  <span className="armour-locked tnum">Locked · {a.cost} XP</span>
+                )}
               </div>
             );
           })}

@@ -820,6 +820,7 @@ export default function App() {
             revenge={!!battle.revenge}
             reward={battle.revenge ? 25 : battle.mode === "speed" ? 20 : 15}
             extraHeart={profile.owned.includes("heart")}
+            armour={profile.armour ?? 0}
             warp={profile.owned.includes("warp")}
             character={profile.character}
             xp={xp}
