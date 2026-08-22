@@ -183,7 +183,18 @@ h1, h2, h3 { font-family: 'Baloo 2', 'Segoe UI', system-ui, sans-serif; letter-s
   box-shadow: var(--glass-hi);
 }
 .topbar .side-logo { margin-bottom: 0; font-size: 19px; }
-.topbar .side-xp { margin: 0 0 0 auto; }
+.topbar .side-xp { margin: 0; }
+/* Your name sits next to the XP so renaming yourself is visible right away. */
+.side-name {
+  margin-left: auto; max-width: 22ch;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 700 14px 'Baloo 2', 'Segoe UI', system-ui, sans-serif; color: var(--text);
+}
+.side-name:empty { display: none; }
+/* Narrow screens need the room for the volume slider. */
+@media (max-width: 560px) { .side-name { display: none; } }
+@media (max-width: 560px) { .topbar .side-xp { margin-left: auto; } }
+.name-note { margin-top: 6px; font-size: 12px; color: var(--muted); }
 
 .menu-fab {
   position: relative;

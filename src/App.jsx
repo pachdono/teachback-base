@@ -542,6 +542,7 @@ export default function App() {
           {streak.last !== localDate(0) && !menuOpen && <span className="nav-dot fab-dot" aria-hidden="true" />}
         </button>
         <div className="side-logo"><span className="logo-mark"><Icon name="rocket" size={18} /></span><span className="wordmark">Teach<span>Back</span></span></div>
+        <div className="side-name" title="Your name, change it on the Player page">{profile.name}</div>
         <div className="side-xp tnum" aria-label={`${xp} experience points`}>{xp} XP</div>
         <div className="vol-ctl">
           <button
@@ -657,7 +658,7 @@ export default function App() {
 
         {page === "shop" && <ShopPage xp={xp} setXp={setXp} profile={profile} setProfile={setProfile} />}
 
-        {page === "player" && <PlayerPage xp={xp} profile={profile} setProfile={setProfile} stats={stats} doneSections={doneSections} />}
+        {page === "player" && <PlayerPage xp={xp} setXp={setXp} profile={profile} setProfile={setProfile} stats={stats} doneSections={doneSections} />}
 
         {page === "home" && !activeMission && !battle && !castMission && (
           <>
@@ -901,7 +902,7 @@ export default function App() {
                 <h3>FINAL BOSS</h3>
                 <p>Teach it back in your own words. The AI grades you.</p>
               </button>
-              {activeMission?.bossBeaten && (
+              {(activeMission?.bossBeaten || profile.demo) && (
                 <button type="button" className="boss-card class-card" onClick={() => setBattle({ classroom: true })}>
                   <div className="boss-card-pixel class-card-kids">
                     <PixelSprite id="bob" size={44} />

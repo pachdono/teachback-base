@@ -683,8 +683,22 @@ function ShopPage({ xp, setXp, profile, setProfile }) {
   );
 }
 
-function PlayerPage({ xp, profile, setProfile, stats, doneSections }) {
+function PlayerPage({ xp, setXp, profile, setProfile, stats, doneSections }) {
   const [confirmReset, setConfirmReset] = useState(false);
+
+  // One button that gets the app ready to show off: enough XP to buy anything
+  // on stage, every theme and perk already owned, top armour, and the
+  // classroom on the map without sitting through a boss fight first.
+  function startPitchMode() {
+    sfx("win");
+    setXp((x) => Math.max(x, 2500));
+    setProfile({
+      ...profile,
+      demo: true,
+      armour: ARMOUR.length - 1,
+      owned: [...new Set([...profile.owned, ...THEMES.map((t) => t.id), ...PERKS.map((p) => p.id)])],
+    });
+  }
   const entries = Object.entries(stats);
   const totalRight = entries.reduce((n, [, v]) => n + v.right, 0);
   const totalWrong = entries.reduce((n, [, v]) => n + v.wrong, 0);
@@ -704,10 +718,12 @@ function PlayerPage({ xp, profile, setProfile, stats, doneSections }) {
             type="text"
             className="name-input"
             aria-label="Player name"
+            placeholder="Your name"
             maxLength={20}
             value={profile.name}
             onChange={(e) => setProfile({ ...profile, name: e.target.value })}
           />
+          <div className="name-note">Shown in the top bar and on the leaderboard.</div>
           <div><span className="rank-pill">{rank}</span></div>
           <div className="level-row tnum">Level {level} · {into}/100 XP to level {level + 1}</div>
           <div className="level-track"><div className="level-fill" style={{ width: `${into}%` }} /></div>
@@ -771,6 +787,25 @@ function PlayerPage({ xp, profile, setProfile, stats, doneSections }) {
           </div>
         </div>
       )}
+
+      <div className="hero-card" style={{ marginTop: 16 }}>
+        <h2>Pitch mode</h2>
+        <p className="sub" style={{ marginBottom: 10 }}>
+          For showing the app to a room. Tops you up to 2,500 XP, unlocks every
+          theme, perk and armour tier, and puts the classroom on the map without
+          beating the boss first.
+        </p>
+        <div className="row" style={{ marginTop: 0 }}>
+          {profile.demo ? (
+            <button className="btn ghost" onClick={() => setProfile({ ...profile, demo: false })}>
+              Turn pitch mode off
+            </button>
+          ) : (
+            <button className="btn gold" onClick={startPitchMode}>Set up a demo</button>
+          )}
+          {profile.demo && <span className="file-note">On. The classroom is on the map.</span>}
+        </div>
+      </div>
 
       <div className="hero-card" style={{ marginTop: 16 }}>
         <h2>Your data</h2>
