@@ -7,6 +7,7 @@ import Battle from "./Battle";
 import BossBattle, { CutScene } from "./BossBattle";
 import Classroom from "./Classroom";
 import { LectureRecorder, Podcast } from "./Listen";
+import { readFile, isReadable, useFileDrop, FileList, MAX_CHARS, ACCEPT } from "./Upload";
 import { AccountPage } from "./Account";
 import { supabase, cloudOn, loadSave as cloudLoad, pushSave, pushScore } from "./supabase";
 import { THEMES, PERKS, RANKS, FAQS, Flashcards, Matching, StatsPage, StudySheet, ExamRun, StreakPage, Faq, ShopPage, PlayerPage } from "./Pages";
@@ -21,6 +22,7 @@ const PLANETS = ["🪐", "🌕", "🌍", "☄️", "🌑", "🌟"];
 export default function App() {
   const [page, setPage] = useState("home");
   const [notes, setNotes] = useState("");
+  const [files, setFiles] = useState([]); // attached documents, kept out of the box
   const [days, setDays] = useState(3);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -286,37 +288,49 @@ export default function App() {
       progress < 90 ? "Charting your mission" :
       "Almost there";
 
-  async function handleFile(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    e.target.value = "";
+  // Attaching a file does not touch the notes box. A PDF can be twenty thousand
+  // words and burying the Launch button under all of it defeats the point of
+  // uploading in the first place. Each file reads on its own, so a slow one
+  // never holds up the rest.
+  function addFiles(list) {
+    const good = list.filter(isReadable);
+    if (good.length < list.length) setError("Only .txt, .md and .pdf files can be read.");
+    else if (good.length) setError("");
 
-    if (file.name.toLowerCase().endsWith(".pdf")) {
-      try {
-        setError("");
-        const buf = await file.arrayBuffer();
-        const pdfjs = await import("pdfjs-dist");
-        const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
-        pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
-        const doc = await pdfjs.getDocument({ data: buf }).promise;
-        let text = "";
-        for (let p = 1; p <= doc.numPages; p++) {
-          const page = await doc.getPage(p);
-          const content = await page.getTextContent();
-          text += content.items.map((it) => it.str).join(" ") + "\n";
-        }
-        if (!text.trim()) throw new Error("no selectable text found, so it may be a scan");
-        setNotes((n) => (n + "\n" + text.trim()).trim());
-      } catch (err) {
-        setError("Couldn't read that PDF: " + err.message);
-      }
-      return;
+    for (const file of good) {
+      // Dropping the same file twice would send its text twice.
+      if (files.some((f) => f.name === file.name)) continue;
+      const id = newId();
+      setFiles((fs) => [...fs, { id, name: file.name, status: "reading", text: "", note: "" }]);
+      readFile(file)
+        .then((text) => setFiles((fs) => fs.map((f) => (f.id === id ? { ...f, status: "ready", text } : f))))
+        .catch((err) => setFiles((fs) => fs.map((f) => (f.id === id ? { ...f, status: "error", note: err.message } : f))));
     }
-
-    const reader = new FileReader();
-    reader.onload = () => setNotes((n) => (n + "\n" + reader.result).trim());
-    reader.readAsText(file);
   }
+
+  function removeFile(id) {
+    setFiles((fs) => fs.filter((f) => f.id !== id));
+  }
+
+  const [dragging, dropProps] = useFileDrop(addFiles);
+
+  // Dropping a file anywhere else makes the browser open it and throw away
+  // everything you had typed, so we swallow those drops.
+  useEffect(() => {
+    const stop = (e) => e.preventDefault();
+    window.addEventListener("dragover", stop);
+    window.addEventListener("drop", stop);
+    return () => {
+      window.removeEventListener("dragover", stop);
+      window.removeEventListener("drop", stop);
+    };
+  }, []);
+
+  // What actually gets sent: the box first, then each file under its own name
+  // so the AI can tell one document from another.
+  const ready = files.filter((f) => f.status === "ready");
+  const allNotes = [notes.trim(), ...ready.map((f) => `[${f.name}]\n${f.text}`)].filter(Boolean).join("\n\n");
+  const readingFiles = files.some((f) => f.status === "reading");
 
   async function buildPlan() {
     setLoading(true);
@@ -331,7 +345,7 @@ export default function App() {
       const res = await fetch(`${API}/api/lesson`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes, days }),
+        body: JSON.stringify({ notes: allNotes, days }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -343,11 +357,12 @@ export default function App() {
         createdAt: Date.now(),
         plan: data,
         doneSections: [],
-        notes: notes.slice(0, 24000),
+        notes: allNotes.slice(0, MAX_CHARS),
       };
       setMissions((ms) => [mission, ...ms]);
       setTimeout(() => setActiveId(mission.id), 350);
       setNotes("");
+      setFiles([]);
     } catch (err) {
       setError("Couldn't build your quest: " + err.message);
     }
@@ -553,26 +568,44 @@ export default function App() {
 
         {page === "home" && !activeMission && !battle && !castMission && (
           <>
-            <div className="hero-card">
+            <div className={`hero-card dropcard ${dragging ? "over" : ""}`} {...dropProps}>
               <h1>Your notes. Your mission.</h1>
               <p className="sub">
-                Paste your study material or upload a file. We'll spread it
-                across days and turn every topic into a battle.
+                Paste your study material, or drop a file straight onto this card.
+                Long documents stay out of the box, so a whole textbook is one drag.
               </p>
               <textarea
                 rows={8}
                 aria-label="Study notes"
-                placeholder="Paste your study notes here"
+                placeholder="Paste your study notes here, or drop a file anywhere on this card"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />
               <div className="row">
-                <label className="upload-label">Upload notes
-                  <input type="file" accept=".txt,.md,.pdf" onChange={handleFile} hidden />
+                <label className="upload-label">Add a file
+                  <input
+                    type="file"
+                    accept={ACCEPT}
+                    multiple
+                    onChange={(e) => { addFiles([...e.target.files]); e.target.value = ""; }}
+                    hidden
+                  />
                 </label>
-                <span className="file-note">.txt, .md or .pdf</span>
+                <span className="file-note">or drag one in. .txt, .md, .pdf</span>
                 <LectureRecorder onText={(t) => setNotes((n) => (n ? n + "\n" + t : t))} />
               </div>
+
+              <FileList files={files} onRemove={removeFile} />
+
+              {allNotes.length > MAX_CHARS && (
+                <p className="file-note" style={{ display: "block", marginTop: 10 }}>
+                  That is {allNotes.length.toLocaleString()} characters. The first{" "}
+                  {MAX_CHARS.toLocaleString()} will be used, which is plenty for a mission.
+                </p>
+              )}
+
+              {dragging && <div className="dropveil">Drop it here</div>}
+
               <div className="row">
                 <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
                   <option value={1}>1 day sprint</option>
@@ -580,8 +613,8 @@ export default function App() {
                   <option value={7}>1 week</option>
                   <option value={14}>2 weeks</option>
                 </select>
-                <button className="btn" onClick={buildPlan} disabled={loading || !notes.trim()}>
-                  {loading ? "Building your mission" : "Launch mission"}
+                <button className="btn" onClick={buildPlan} disabled={loading || readingFiles || !allNotes.trim()}>
+                  {loading ? "Building your mission" : readingFiles ? "Reading your file" : "Launch mission"}
                 </button>
               </div>
               {loading && (

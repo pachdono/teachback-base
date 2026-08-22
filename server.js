@@ -35,7 +35,9 @@ app.use("/api", (req, res, next) => {
 
 const client = new Anthropic();
 
-const MAX_NOTES = 24000;
+// A pasted PDF is easily this long. Roughly 15k tokens, which the model
+// handles fine and keeps one mission cheap.
+const MAX_NOTES = 60000;
 
 // Errors we wrote are safe to show. Anything else stays in the log.
 function userError(message) {

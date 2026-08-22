@@ -40,7 +40,7 @@ const FAQS = [
   { q: "How do I earn XP?", a: "Win quiz battles (15 XP), speed rounds (20 XP), flashcard decks and matching games (10 XP each), and boss fights (up to 100 XP). Spend it in the Shop on themes and perks." },
   { q: "What happens when I get a question wrong?", a: "You lose a heart, but you also get the method, a step-by-step explanation of how to reach the answer, and the question comes back until you beat it." },
   { q: "Is my progress saved?", a: "Your XP, name, avatar and shop purchases are saved in your browser. Mission plans are rebuilt fresh from your notes each session." },
-  { q: "What files can I upload?", a: ".txt and .md files. For PDFs, copy and paste the text for now." },
+  { q: "What files can I upload?", a: "Drag a .txt, .md or PDF onto the notes card, or use Add a file. The text stays attached instead of filling the box, so a long document is one drag. A PDF has to hold real text, a photo of a page will not work." },
 ];
 
 function Flashcards({ section, onStat, onDone, onExit }) {

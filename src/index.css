@@ -362,6 +362,37 @@ select {
 .upload-label:hover { background: rgba(255,255,255,.1); }
 .file-note { font-size: 12px; color: var(--muted); }
 
+/* ---- Attached files and drag and drop ---- */
+.dropcard.over { border-color: var(--purple); box-shadow: var(--shadow-2), var(--glow); }
+
+.dropveil {
+  position: absolute; inset: 0; z-index: 5;
+  display: grid; place-items: center;
+  border-radius: 20px; border: 2px dashed var(--purple);
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  backdrop-filter: blur(2px);
+  font: 800 20px 'Baloo 2', sans-serif; color: var(--text);
+  pointer-events: none; /* or the drop would land on the veil, not the card */
+}
+
+.filelist { list-style: none; margin-top: 12px; display: grid; gap: 8px; }
+.filerow {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px;
+  background: rgba(255,255,255,.04); font-size: 13px;
+}
+.filerow svg { color: var(--purple2); flex: none; }
+.filerow.error svg { color: var(--red); }
+.filename { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filestate { margin-left: auto; color: var(--muted); font-size: 12px; }
+.filerow.error .filestate { color: var(--red); }
+.filex {
+  flex: none; display: grid; place-items: center;
+  width: 24px; height: 24px; padding: 0; border: 0; border-radius: 8px;
+  background: transparent; color: var(--muted); cursor: pointer;
+}
+.filex:hover { background: rgba(255,255,255,.1); color: var(--text); }
+
 .error {
   margin-top: 16px; padding: 12px 16px;
   border: 1px solid rgba(255,92,97,.4); border-radius: 12px;
