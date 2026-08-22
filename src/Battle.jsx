@@ -196,15 +196,21 @@ function Battle({ section, speed, revenge, reward = 15, extraHeart, warp, armour
     if (!timed || locked || won || dead) return;
     setTimeLeft(T);
     const t = setInterval(() => {
-      setTimeLeft((s) => {
-        if (s <= 3.2 && s > 3.1) sfx("tick");
-        if (s <= 0.1) { clearInterval(t); answer(false, true); return 0; }
-        return s - 0.1;
-      });
+      // Only subtract here. Playing a sound or answering from inside a state
+      // updater runs twice in development, which fired the miss twice.
+      setTimeLeft((s) => (s <= 0 ? 0 : s - 0.1));
     }, 100);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queue, locked, timed]);
+
+  // Running out of time counts as a wrong answer, handled once, outside the tick.
+  useEffect(() => {
+    if (!timed || locked || won || dead) return;
+    if (timeLeft <= 3.2 && timeLeft > 3.1) sfx("tick");
+    if (timeLeft <= 0) answer(false, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLeft, timed, locked, won, dead]);
 
   function reset() {
     setHit(false);
