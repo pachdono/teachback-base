@@ -52,7 +52,7 @@ Both have to be running. The front end takes port 5173 or the next free one, the
 server takes 3001.
 
 Accounts are optional. Leave the Supabase keys blank and the app saves to your
-browser instead. See `SUPABASE.md` to turn them on.
+browser instead. The setup guide for turning them on lives in the teachback repo.
 
 ## How it is built
 
